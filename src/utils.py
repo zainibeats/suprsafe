@@ -1,0 +1,128 @@
+import os
+import random
+import sys
+import bcrypt
+import tkinter as tk
+from tkinter import simpledialog
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+# File where the password hash will be stored
+PASSWORD_FILE = "password_hash.bin"
+
+# Derives a key from a password using PBKDF2HMAC
+def derive_key(password, salt, iterations, key_len):
+  kdf = PBKDF2HMAC(
+      algorithm=hashes.SHA256(),
+      length=key_len,
+      salt=salt,
+      iterations=iterations,
+  )
+  return kdf.derive(password)
+
+# Hash the password using bcrypt
+def create_password_hash(password):
+    password = password.encode()
+    hashed = bcrypt.hashpw(password, bcrypt.gensalt())
+    return hashed
+
+# Check if the entered password matches the stored hash
+def check_password(stored_hash, password):
+    password = password.encode()
+    return bcrypt.checkpw(password, stored_hash)
+
+# On first startup, set a password for the user
+def set_password():
+    password = input("Please set your account password: ")
+    confirm_password = input("Confirm your password: ")
+
+    if password != confirm_password:
+        print("Passwords do not match. Please try again.")
+        return set_password()
+    
+    password_hash = create_password_hash(password)
+
+    with open(PASSWORD_FILE, 'wb') as f:
+        f.write(password_hash)
+
+    print("Password set successfully.")
+
+# Get the stored password hash from the file
+def get_stored_password_hash():
+    if os.path.exists(PASSWORD_FILE):
+        with open(PASSWORD_FILE, 'rb') as f:
+            return f.read()
+        
+    else:
+        return None
+
+# Save the salt to the keys_ivs folder for future decryption
+def store_salt(salt):
+    salt_dir = os.path.join(os.getcwd(), 'salt_files')
+    os.makedirs(salt_dir, exist_ok=True)  # Create the directory if it doesn't exist
+    salt_path = os.path.join(salt_dir, 'salt.bin')
+    try:
+        with open(salt_path, 'wb') as f:
+            f.write(salt)
+        print(f"Salt stored at {salt_path}")
+    except OSError as e:
+        print(f"Failed to write salt: {e}")
+        sys.exit(1)
+
+# Look for and read stored salt from program files
+def get_stored_salt():
+    salt_dir = os.path.join(os.getcwd(), 'salt_files')
+    salt_path = os.path.join(salt_dir, 'salt.bin')
+    if os.path.exists(salt_path):
+        with open(salt_path, 'rb') as f:
+            return f.read()
+    else:
+        print("Salt file not found. Ensure the program has run at least once to generate it.")
+        sys.exit(1)
+
+# Delete the old files after encryption/decryption
+def secure_delete(file_path, passes=4):
+    with open(file_path, 'r+b') as f:
+        length = os.path.getsize(file_path)
+        for _ in range(passes):
+            f.seek(0)
+            f.write(bytearray(random.getrandbits(8) for _ in range(length)))
+    os.remove(file_path)
+
+# Function to create floating gui window
+def create_message_window(message):
+    root = tk.Tk()
+    root.title("Message")
+    tk.Label(root, text=message, wraplength=400, padx=10, pady=10).pack()
+    tk.Button(root, text="Close", command=root.quit).pack()
+    root.mainloop()
+
+# Ask user to input their main key
+def prompt_for_main_key():
+    root = tk.Tk()
+    root.withdraw()
+    while True:
+        key = simpledialog.askstring("Main Key", "Enter 32-byte main key:")
+        if len(key) != 32:
+            print("Error: The main key must be exactly 32 characters long. Please try again.")
+            continue
+        return key.encode()
+
+# Decrypt aes key and iv with main key
+def decrypt_aes_key_and_iv(ciphertext, tag, nonce, main_key):
+    # Decrypt AES key with the main key using ECB mode
+    cipher = Cipher(algorithms.AES(main_key), modes.GCM(nonce, tag=tag), backend=default_backend())
+    decryptor = cipher.decryptor()
+    decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
+
+    # Extract AES key and IV
+    aes_key = decrypted_data[:32]  # First 32 bytes for AES key
+    iv = decrypted_data[32:48]    # Next 16 bytes for IV
+
+    if len(iv) != 16:
+        raise ValueError(f"Invalid IV length: {len(iv)} bytes (expected 16 bytes)")
+
+    print(f"Decrypted AES Key Length: {len(aes_key)} bytes")
+    return aes_key, iv
