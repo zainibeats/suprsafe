@@ -66,7 +66,7 @@ def store_salt(salt):
     try:
         with open(salt_path, 'wb') as f:
             f.write(salt)
-        print(f"Salt stored at {salt_path}")
+        #print(f"Salt stored at {salt_path}") # Debugging
     except OSError as e:
         print(f"Failed to write salt: {e}")
         sys.exit(1)
@@ -95,14 +95,49 @@ def secure_delete(file_path, passes=4):
 def create_message_window(message):
     root = tk.Tk()
     root.title("Message")
-    tk.Label(root, text=message, wraplength=400, padx=10, pady=10).pack()
+
+    # Set the window to always stay on top
+    root.attributes("-topmost", 1)
+
+    # Get screen width and height
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+
+    # Get window width and height
+    window_width = 400
+    initial_height = 100
+
+    # Calculate position to center the window
+    position_top = int(screen_height / 2 - initial_height / 2)
+    position_right = int(screen_width / 2 - window_width / 2)
+
+    # Set the position of the window
+    root.geometry(f'{window_width}x{initial_height}+{position_right}+{position_top}')
+
+    # Create a label with the wrapped message
+    label = tk.Label(root, text=message, wraplength=window_width - 20, padx=10, pady=10)
+    label.pack()
+
+    # Update the window size after the text has been wrapped
+    label.update_idletasks()  # Ensure the widget has been rendered before measuring its height
+    window_height = label.winfo_height()  # Get the height of the wrapped text
+
+    # Set the window's geometry with the new height
+    root.geometry(f'{window_width}x{window_height + 80}+{position_right}+{position_top}')  # Add some padding
+
+    # Add the Close button
     tk.Button(root, text="Close", command=root.quit).pack()
+
+    # Handle the close button (X) click by binding the protocol
+    root.protocol("WM_DELETE_WINDOW", root.quit)
+
     root.mainloop()
 
 # Ask user to input their main key
 def prompt_for_main_key():
     root = tk.Tk()
-    root.withdraw()
+    root.withdraw() # Hide the main window
+    root.attributes("-topmost", 1) # Set the window to always stay on top
     while True:
         key = simpledialog.askstring("Main Key", "Enter 32-byte main key:")
         if len(key) != 32:

@@ -6,6 +6,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
+from decrypt import decrypt_files_in_directory
 from utils import (
     create_message_window,
     secure_delete,
@@ -15,7 +16,6 @@ from utils import (
     check_password,
     store_salt,
 )
-from decrypt import decrypt_files_in_directory
 
 # New account password setup
 def setup_password():
@@ -97,7 +97,7 @@ def encrypt_files_in_directory(directory):
     for filename in os.listdir(directory):
         file_path = os.path.join(directory, filename)
         if filename in ["main.py", "decrypt.py", "utils.py", "keys_ivs", "password_hash.bin", "SuprSafe.exe"] or os.path.isdir(file_path):
-            print(f"Skipping {filename}")
+            #print(f"Skipping {filename}") # Debugging
             continue
 
         # Encrypt file
@@ -118,6 +118,7 @@ def encrypt_files_in_directory(directory):
             secure_delete(file_path)
         except Exception as e:
             print(f"Error encrypting {file_path}: {e}")
+
             # Cleanup partial files if an error occurs
             for temp_file in [encrypted_file_path, tag_file_path, nonce_file_path]:
                 if os.path.exists(temp_file):
@@ -127,7 +128,7 @@ def encrypt_files_in_directory(directory):
     # Encrypt the keys_ivs directory using account password
     encrypt_directory_with_password(keys_dir, account_password)
 
-    create_message_window("Encryption completed! Don't lose your keys.")
+    create_message_window("Encryption completed! Don't lose your main key or account password.")
 
 # Encrypt the keys_ivs directory with the account password
 def encrypt_directory_with_password(directory, password):
@@ -144,16 +145,12 @@ def encrypt_directory_with_password(directory, password):
         backend=default_backend()
     )
     derived_key = kdf.derive(password.encode())
-    print(f"Directory '{directory}' encrypted with password-derived key!")
-    print(derived_key)
+    #print(f"Directory '{directory}' encrypted with password-derived key!") # Debugging
 
 # Function that is called upon launching program
 def main():
     # Check if account password is set up
     setup_password()
-  
-    # Prompt for account password before continuing
-    prompt_for_password()
 
     # Ask the user for the mode: 'e' for encryption or 'd' for decryption
     action = input("Choose action: (e) Encrypt or (d) Decrypt: ").strip().lower()

@@ -12,6 +12,7 @@ from utils import (
     decrypt_aes_key_and_iv,
     get_stored_password_hash,
     check_password,
+    create_message_window,
 )
 
 # Decrypt the keys_ivs directory using the account password
@@ -46,8 +47,6 @@ def decrypt_file(file_path, aes_key, iv, tag, nonce):
         print(f"Decryption Error: {e}")
         return None
 
-    # print(f"File {file_path} decrypted to {decrypted_file_path}")
-
 # Decrypt all files in the directory in which this program ran in
 def decrypt_files_in_directory(directory):
     account_password = getpass.getpass("Enter your account password to unlock keys: ")
@@ -62,8 +61,6 @@ def decrypt_files_in_directory(directory):
     if not check_password(stored_hash, account_password):
         print("Incorrect password. Exiting.")
         return
-
-    print("Password verified!")
 
     # Only proceed to the next steps if the password is correct
     keys_dir = os.path.join(directory, 'keys_ivs')
@@ -84,7 +81,6 @@ def decrypt_files_in_directory(directory):
     # Call the function to decrypt the AES key and IV
     #main_key = prompt_for_main_key()
     aes_key, iv = decrypt_aes_key_and_iv(ciphertext, tag, nonce, main_key)
-    #print(f"AES Key: {aes_key}, Length: {len(aes_key)}")
 
     if aes_key is None:
         return
@@ -95,7 +91,7 @@ def decrypt_files_in_directory(directory):
 
         # Skip directories and non-encrypted files
         if os.path.isdir(file_path) or not filename.endswith(".enc"):
-            print(f"Skipping {filename}")
+            #print(f"Skipping {filename}") # Debugging
             continue
 
         # Remove the ".enc" extension from the file path only if it ends with ".enc"
@@ -107,10 +103,6 @@ def decrypt_files_in_directory(directory):
         # Find the corresponding .enc.tag and .enc.nonce files
         tag_file_path = base_file_path + ".enc.tag"
         nonce_file_path = base_file_path + ".enc.nonce"
-
-        # Debugging: Print the tag and nonce file paths to check where it's looking
-        print(f"Looking for tag file: {tag_file_path}")
-        print(f"Looking for nonce file: {nonce_file_path}")
 
         # Check if both the tag and nonce files exist
         if not os.path.exists(tag_file_path) or not os.path.exists(nonce_file_path):
@@ -143,9 +135,10 @@ def decrypt_files_in_directory(directory):
             secure_delete(file_path)
             secure_delete(tag_file_path)
             secure_delete(nonce_file_path)
-            print(f"Deleted encrypted files for {filename}.")
         except Exception as e:
             print(f"Error deleting files for {filename}: {e}")
+
+    create_message_window("Your files are now decrypted. Don't lose your main key or account password.")
 
 if __name__ == "__main__":
     current_dir = os.getcwd()
