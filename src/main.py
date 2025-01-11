@@ -149,6 +149,9 @@ def encrypt_directory_with_password(directory, password):
 
 # Function that is called upon launching program
 def main():
+    # Display the welcome message
+    print("Welcome to SuprSafe!\n")
+
     # Check if account password is set up
     setup_password()
 

@@ -1,13 +1,18 @@
 # **SuprSafe**
 
+**Warning**: This project may have flaws, and caution is advised when using the software. If the program is interrupted during encryption or decryption, there may not be a way to restore the data. SuprSafe has not undergone extensive testing, and its stability and reliability are not guaranteed. Use at your own risk.
+
 **SuprSafe** is a powerful yet user-friendly file encryption software that safeguards your sensitive data using the industry-standard AES-256 algorithm. With its intuitive command-line interface (CLI), SuprSafe empowers you to encrypt and decrypt files effortlessly, ensuring their confidentiality without unnecessary complexity.
+
+**Note**: SuprSafe is designed for **one user per distribution**. Each copy of the software can only be used by a single account, ensuring that encryption keys remain secure and isolated for each user.
 
 ## Features
 
-- **Robust AES-256 Encryption:** SuprSafe leverages the industry-leading AES-256 encryption standard to provide unparalleled security for your files.
-- **Secure File Deletion:** Rest assured that after encryption or decryption, the original unencrypted files are meticulously deleted using secure methods, eliminating any traces of sensitive information.
-- **Streamlined Interface:** The CLI-based approach fosters a lightweight and straightforward user experience, making SuprSafe easy to learn and use.
+- **AES-256 Encryption**: Industry-standard encryption for your files.
+- **Secure File Deletion**: Original files are securely deleted after encryption or decryption to ensure no traces are left.
+- **Minimal Interface**: Command-line based encryption and decryption, making it lightweight and straightforward.
 - **Password Protection:** SuprSafe safeguards your encryption keys with a user-defined password, ensuring an additional layer of security.
+- **Optional Executable**: SuprSafe can be run as an executable (`SuprSafe.exe`) for easier access, included in the release on GitHub.
 
 ## Requirements
 
@@ -34,25 +39,28 @@ pip install cryptography
 ```bash
 python main.py
 ```
+Alternatively, you can download the compiled executable (SuprSafe.exe) from the GitHub releases page and run it directly without needing to install Python or dependencies.
 
 ## Usage
 
-SuprSafe presents you with a user-friendly CLI menu upon execution. Here's how to interact with it:
+Once you run the program (either via the Python script or the executable), you will be presented with a simple command-line interface to choose between encryption or decryption. You will be prompted on the initial startup to create an account password. **THIS IS THE PASSWORD THAT WILL BE USED TO ALLOW YOU TO USE THE PROGRAM. MAKE SURE IT IS A COMPLEX PASSWORD**
 
-**Encryption:**
+**Encrypting Files:**
 
-1. **Choose Encryption:** Select option 1 ("Encrypt Files") from the menu.
-2. **Set Password:** Define a robust password that will be used to generate the AES-256 encryption key. Choose a password you can remember well, as its loss will prevent access to your encrypted files.
-3. **File Selection:** Specify the files you want to encrypt. SuprSafe allows you to select multiple files at once.
-4. **Encrypted Files:** The encrypted files will be saved with extensions like `.enc`, `.enc.tag`, and `.enc.nonce` to indicate their encrypted state.
+1. Place the SuprSafe.exe or .py files in the directory you want all files to be encrypted at
+2. Run the program and choose (e) option to encrypt files - you will be asked to create an account password on first launch. After this, you will be prompted for that password **after** choosing encrypt / decrypt option in the CLI
+3. Enter your main key (32 character alphanumeric string) SuprSafe will use this to encrypt the randomly generated AES key and IV.
+4. The encrypted files will be saved with extensions like `.enc`, `.enc.tag`, and `.enc.nonce` to indicate their encrypted state
+5. Your files are now encrypted - **DO NOT REMOVE ANY FILES ADDED BY THE SUPRSAFE**
 
-**Decryption:**
+**Decrypting Files:**
 
-1. **Choose Decryption:** Select option 2 ("Decrypt Files") from the menu.
-2. **Account Password:** Enter the password used to secure your encryption keys.
-3. **Main Password:** Provide the main password you used during the encryption process.
-4. **Decrypted Files:** The program will decrypt the selected files and restore them with their original filenames.
-5. **Secure Deletion:** SuprSafe securely deletes the encrypted files after successful decryption, eliminating any potential data remnants.
+1. Place the SuprSafe.exe or .py files in the directory you want all files to be decrypted at (if not already there)
+2. Run the program and choose (d) option to decrypt files
+3. Enter the account password created upon first launch
+3. Provide the main key you used during the encryption process
+4. The program will decrypt the selected files and restore them with their original filenames.
+5. SuprSafe securely deletes the encrypted files after successful decryption, eliminating any potential data remnants.
 
 ## CLI Menu
 
@@ -60,16 +68,15 @@ SuprSafe presents you with a user-friendly CLI menu upon execution. Here's how t
 Welcome to SuprSafe!
 
 Please choose an option:
-  1. Encrypt Files
-  2. Decrypt Files
-  3. Exit
+  (e) Encrypt Files
+  (d) Decrypt Files
 ```
 
 ## Security Considerations
 
 **Password Safety:**
 
-- Exercise caution and select a strong and memorable main password. Losing this password will render your encrypted files inaccessible as there's no way to recover them. Consider using password management tools to store your password securely.
+- Exercise caution and select a complex and memorable account password. For the main key, ensure you store off of any digital devices for ultimate security. Losing this password **or** main key will render your encrypted files inaccessible as there's no way to recover them. Consider using password management tools to store your password securely.
 
 **Secure Deletion:**
 
@@ -78,5 +85,3 @@ Please choose an option:
 ## License
 
 SuprSafe is open-source software licensed under the permissive MIT License. This enables you to freely use, modify, and distribute SuprSafe while complying with the license terms (refer to the LICENSE file for details).
-
-I hope this enhanced README.md provides a clear and informative guide for SuprSafe users!
