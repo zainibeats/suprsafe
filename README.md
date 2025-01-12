@@ -2,7 +2,7 @@
 
 **Warning**: This project may have flaws, and caution is advised when using the software. If the program is interrupted during encryption or decryption, there may not be a way to restore the data. SuprSafe has not undergone extensive testing, and its stability and reliability are not guaranteed. Use at your own risk.
 
-**SuprSafe** is a powerful yet user-friendly file encryption software that safeguards your sensitive data using the industry-standard AES-256 algorithm. With its intuitive command-line interface (CLI), SuprSafe empowers you to encrypt and decrypt files effortlessly, ensuring their confidentiality without unnecessary complexity.
+**SuprSafe** is a powerful yet user-friendly file encryption software that safeguards your sensitive data using the industry-standard AES-256 algorithm. With its intuitive command-line interface (CLI), SuprSafe empowers you to encrypt and decrypt files effortlessly, ensuring their confidentiality without unnecessary complexity. A companion key generator tool is included to help generate secure main keys.
 
 **Note**: SuprSafe is designed for **one user per distribution**. Each copy of the software can only be used by a single account, ensuring that encryption keys remain secure and isolated for each user.
 
@@ -12,6 +12,7 @@
 - **Secure File Deletion**: Original files are securely deleted after encryption or decryption to ensure no traces are left.
 - **Minimal Interface**: Command-line based encryption and decryption, making it lightweight and straightforward.
 - **Password Protection:** SuprSafe safeguards your encryption keys with a user-defined password, ensuring an additional layer of security.
+- **Key Generator Tool**: A separate utility (`main_key.py`) to generate secure 32-character main keys. Simply run the tool and press Enter to generate new keys, or 'q' to quit. Generated keys are suitable for use with SuprSafe's encryption process.
 - **Optional Executable**: SuprSafe can be run as an executable (`SuprSafe.exe`) for easier access, included in the release on GitHub.
 
 ## Requirements
