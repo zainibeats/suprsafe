@@ -154,19 +154,76 @@ def create_message_window(message):
 
     root.mainloop()
 
-# Ask user to input their main key
-def prompt_for_main_key():
+# Creates a temporary state file with minimal info
+def create_temp_state(operation_type, directory):
+    state_file = os.path.join(os.path.dirname(directory), '.suprsafe_temp')
+    try:
+        with open(state_file, 'w') as f:
+            f.write(f"{operation_type}:{directory}")
+    except Exception:
+        pass  # Fail silently for security
+
+# Removes the temporary state file
+def cleanup_temp_state(directory):
+    state_file = os.path.join(os.path.dirname(directory), '.suprsafe_temp')
+    try:
+        if os.path.exists(state_file):
+            secure_delete(state_file)
+    except Exception:
+        pass  # Fail silently for security
+
+# Cleanup handler for interrupts
+def handle_interrupt(directory):
+    print("\n\nOperation interrupted. Cleaning up...")
+    cleanup_temp_state(directory)
+    sys.exit(1)
+
+# Prompt for main key with retry logic and verification
+def prompt_for_main_key(check_existing=False, existing_key_data=None, directory=None):
     root = tk.Tk()
-    root.withdraw() # Hide the main window
-    root.attributes("-topmost", 1) # Set the window to always stay on top
-    while True:
+    root.withdraw()
+    root.attributes("-topmost", 1)
+    
+    attempts = 0
+    while attempts < 3:
         key = simpledialog.askstring("Main Key", "Enter 32-byte main key:")
+        
         if key is None:  # User clicked Cancel
+            print("\nMain key entry cancelled. Exiting program.")
+            if directory:  # Only cleanup if directory is provided
+                cleanup_temp_state(directory)
             sys.exit(0)
-        if key and len(key) != 32:  # Only show error if key was provided but invalid
+            
+        key = key.strip()  # Strip any whitespace
+            
+        if len(key) != 32:
             print("Error: The main key must be exactly 32 characters long. Please try again.")
             continue
-        return key.encode()
+            
+        encoded_key = key.encode()
+        
+        # If we need to verify against existing key
+        if check_existing and existing_key_data:
+            try:
+                ciphertext, tag, nonce = existing_key_data
+                # Try to decrypt with the provided key
+                cipher = Cipher(algorithms.AES(encoded_key), modes.GCM(nonce, tag=tag), backend=default_backend())
+                decryptor = cipher.decryptor()
+                decryptor.update(ciphertext) + decryptor.finalize()
+                return encoded_key  # Key is correct
+            except Exception:
+                attempts += 1
+                if attempts < 3:
+                    print(f"Invalid main key. {3 - attempts} attempt(s) remaining.")
+                    continue
+                else:
+                    print("Too many failed attempts. Exiting.")
+                    sys.exit(1)
+        else:
+            return encoded_key  # New key, no verification needed
+    
+    print("Too many failed attempts. Exiting.")
+    sys.exit(1)
 
 # Decrypt aes key and iv with main key
 def decrypt_aes_key_and_iv(ciphertext, tag, nonce, main_key):
@@ -202,6 +259,7 @@ def get_directory_from_user():
     
     return directory
 
+# Loading animation
 def animate_loading(message="Processing"):
     global _stop_animation
     dots = 1
@@ -210,6 +268,7 @@ def animate_loading(message="Processing"):
         dots = (dots % 3) + 1
         time.sleep(0.5)
 
+# Start loading animation
 def start_loading_animation(message="Processing"):
     global _stop_animation
     _stop_animation = False
@@ -218,33 +277,9 @@ def start_loading_animation(message="Processing"):
     animation_thread.start()
     return animation_thread
 
+# Stop loading animation
 def stop_loading_animation(thread):
     global _stop_animation
     _stop_animation = True
     thread.join(timeout=1)
     print('\r' + ' ' * 50 + '\r', end='', flush=True)  # Clear the animation line
-
-# Add these new functions
-def create_temp_state(operation_type, directory):
-    """Creates a temporary state file with minimal info"""
-    state_file = os.path.join(os.path.dirname(directory), '.suprsafe_temp')
-    try:
-        with open(state_file, 'w') as f:
-            f.write(f"{operation_type}:{directory}")
-    except Exception:
-        pass  # Fail silently for security
-
-def cleanup_temp_state(directory):
-    """Removes the temporary state file"""
-    state_file = os.path.join(os.path.dirname(directory), '.suprsafe_temp')
-    try:
-        if os.path.exists(state_file):
-            secure_delete(state_file)
-    except Exception:
-        pass  # Fail silently for security
-
-def handle_interrupt(directory):
-    """Cleanup handler for interrupts"""
-    print("\n\nOperation interrupted. Cleaning up...")
-    cleanup_temp_state(directory)
-    sys.exit(1)

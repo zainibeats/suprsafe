@@ -23,12 +23,12 @@ from utils import (
     handle_interrupt,
 )
 
-# New account password setup
+# Setup account password on first run
 def setup_password():
     if not os.path.exists("password_hash.bin"):
-        set_password() # Call function in utils.py
+        set_password()
 
-# Prompt for account password during each session
+# Verify account password with 3 attempts
 def prompt_for_password():
     stored_hash = get_stored_password_hash()
 
@@ -41,7 +41,7 @@ def prompt_for_password():
         password = input("Enter your account password: ")
 
         if check_password(stored_hash, password):
-            return  # Password correct, exit the function
+            return
     
         attempts += 1
         print(f"Invalid password. {3 - attempts} attempt(s) remaining.")
@@ -49,20 +49,19 @@ def prompt_for_password():
     print("Too many failed attempts. Exiting.")
     sys.exit(1)
 
-# Encrypt the AES key and IV with the main key
+# Encrypt AES key and IV using main key with GCM mode
 def encrypt_aes_key_and_iv(aes_key, iv, main_key):
-    # Encrypt AES key with the main key using ECB mode
-    nonce = os.urandom(16)  # Generate a 16-byte nonce (128 bits)
+    nonce = os.urandom(16)
     cipher = Cipher(algorithms.AES(main_key), modes.GCM(nonce), backend=default_backend())
     encryptor = cipher.encryptor()
-    data = aes_key + iv  # Combine AES key and IV for encryption
+    data = aes_key + iv
     ciphertext = encryptor.update(data) + encryptor.finalize()
     tag = encryptor.tag
     return ciphertext, tag, nonce
 
-# Function to encrypt a file
+# Encrypt a single file using AES-GCM
 def encrypt_file(file_path, aes_key, iv):
-    nonce = os.urandom(16) #generate nonce for file encryption
+    nonce = os.urandom(16)
     cipher = Cipher(algorithms.AES(aes_key), modes.GCM(nonce), backend=default_backend())
     encryptor = cipher.encryptor()
     with open(file_path, 'rb') as f:
@@ -70,10 +69,11 @@ def encrypt_file(file_path, aes_key, iv):
     ciphertext = encryptor.update(data) + encryptor.finalize()
     tag = encryptor.tag
     
-    return ciphertext, tag, nonce #return nonce as well
+    return ciphertext, tag, nonce
 
-# Encrypt all files in the directory in which this program ran in
+# Encrypt all files in selected directory
 def encrypt_files_in_directory(directory):
+    animation_thread = None
     try:
         create_temp_state('encrypt', directory)
         # Add signal handlers for interrupts
@@ -165,13 +165,11 @@ def encrypt_files_in_directory(directory):
     finally:
         cleanup_temp_state(directory)
 
-# Encrypt the keys_ivs directory with the account password
+# Encrypt keys directory with account password
 def encrypt_directory_with_password(directory, password):
-    # Generate and store salt securely
     salt = secrets.token_bytes(16)
     store_salt(salt)
 
-    # Use PBKDF2 to derive the key from the password
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         salt=salt,
@@ -180,9 +178,8 @@ def encrypt_directory_with_password(directory, password):
         backend=default_backend()
     )
     derived_key = kdf.derive(password.encode())
-    #print(f"Directory '{directory}' encrypted with password-derived key!") # Debugging
 
-# Function that is called upon launching program
+# Main program entry point
 def main():
     print("Welcome to SuprSafe!\n")
     setup_password()
@@ -201,5 +198,6 @@ def main():
         print("Invalid choice. Please choose 'e' for encryption or 'd' for decryption.")
         return
 
+# Main entry point for program
 if __name__ == "__main__":
     main()

@@ -25,18 +25,14 @@ import threading
 import time
 import signal
 
-# Decrypt the keys_ivs directory using the account password
+# Decrypt keys directory using account password
 def decrypt_keys_ivs_directory(directory, password):
     directory = os.path.join(directory, 'keys_ivs')
-
-    # Use the utility function to retrieve the salt from the correct location
     salt = get_stored_salt()
-
-    # Derive the key from the password using PBKDF2
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         salt=salt,
-        length=32,  # Must be 32 for AES-256
+        length=32,
         iterations=100000,
         backend=default_backend()
     )
@@ -44,11 +40,11 @@ def decrypt_keys_ivs_directory(directory, password):
     print("Directory decrypted and password verified!")
     return derived_key
 
-# Function that decrypts a file
+# Decrypt a single file using AES-GCM
 def decrypt_file(file_path, aes_key, iv, tag, nonce):
     with open(file_path, 'rb') as f:
         ciphertext = f.read()
-    cipher = Cipher(algorithms.AES(aes_key), modes.GCM(nonce, tag), backend=default_backend()) #add nonce to cipher
+    cipher = Cipher(algorithms.AES(aes_key), modes.GCM(nonce, tag), backend=default_backend())
     decryptor = cipher.decryptor()
     try:
         data = decryptor.update(ciphertext) + decryptor.finalize()
@@ -57,8 +53,9 @@ def decrypt_file(file_path, aes_key, iv, tag, nonce):
         print(f"Decryption Error: {e}")
         return None
 
-# Decrypt all files in the directory in which this program ran in
+# Decrypt all files in selected directory
 def decrypt_files_in_directory(directory):
+    animation_thread = None
     try:
         create_temp_state('decrypt', directory)
         # Add signal handlers for interrupts
@@ -79,18 +76,19 @@ def decrypt_files_in_directory(directory):
                 keys_dir = os.path.join(directory, 'keys_ivs')
                 salt = get_stored_salt()
                 derived_key = derive_key(account_password.encode(), salt, 100000, 32)
-                main_key = prompt_for_main_key()
+
+                with open(os.path.join(directory, 'keys_ivs', 'encrypted_keys_ivs.bin'), 'rb') as f:
+                    data = f.read()
+                ciphertext = data[:-32]
+                tag = data[-32:-16]
+                nonce = data[-16:]
+
+                main_key = prompt_for_main_key(check_existing=True, existing_key_data=(ciphertext, tag, nonce), directory=directory)
 
                 try:
                     # Start the loading animation
                     animation_thread = start_loading_animation("Decrypting files")
 
-                    with open(os.path.join(directory, 'keys_ivs', 'encrypted_keys_ivs.bin'), 'rb') as f:
-                        data = f.read()
-                    ciphertext = data[:-32]
-                    tag = data[-32:-16]
-                    nonce = data[-16:]
-                    
                     # Decrypt the AES key and IV
                     aes_key, iv = decrypt_aes_key_and_iv(ciphertext, tag, nonce, main_key)
                     if aes_key is None:
@@ -177,8 +175,7 @@ def decrypt_files_in_directory(directory):
         if animation_thread:
             stop_loading_animation(animation_thread)
 
-
-
+# Main entry point for decrypting files
 if __name__ == "__main__":
     directory = get_directory_from_user()
     decrypt_files_in_directory(directory)
