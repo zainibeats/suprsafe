@@ -15,6 +15,12 @@ from utils import (
     get_stored_password_hash,
     check_password,
     store_salt,
+    get_directory_from_user,
+    start_loading_animation,
+    stop_loading_animation,
+    create_temp_state,
+    cleanup_temp_state,
+    handle_interrupt,
 )
 
 # New account password setup
@@ -68,67 +74,96 @@ def encrypt_file(file_path, aes_key, iv):
 
 # Encrypt all files in the directory in which this program ran in
 def encrypt_files_in_directory(directory):
-    aes_key = secrets.token_bytes(32)
-    iv = secrets.token_bytes(16)
-    account_password = getpass.getpass("Enter your account password: ")
-    stored_hash = get_stored_password_hash()
-
-    if stored_hash is None:
-        print("No password set up. Exiting program.")
-        sys.exit(1)
-
-    if not check_password(stored_hash, account_password):
-        print("Incorrect password. Exiting.")
-        sys.exit(1)
-
-    main_key = prompt_for_main_key()
-    ciphertext, tag, nonce = encrypt_aes_key_and_iv(aes_key, iv, main_key)
-    keys_dir = os.path.join(directory, 'keys_ivs')
-    os.makedirs(keys_dir, exist_ok=True)
-
-    salt = secrets.token_bytes(16)
-    store_salt(salt)
-
-    with open(os.path.join(keys_dir, 'encrypted_keys_ivs.bin'), 'wb') as f:
-        f.write(ciphertext)
-        f.write(tag)
-        f.write(nonce)
+    try:
+        create_temp_state('encrypt', directory)
+        # Add signal handlers for interrupts
+        import signal
+        signal.signal(signal.SIGINT, lambda s, f: handle_interrupt(directory))
         
-    for filename in os.listdir(directory):
-        file_path = os.path.join(directory, filename)
-        if filename in ["main.py", "decrypt.py", "utils.py", "keys_ivs", "password_hash.bin", "SuprSafe.exe"] or os.path.isdir(file_path):
-            #print(f"Skipping {filename}") # Debugging
-            continue
+        aes_key = secrets.token_bytes(32)
+        iv = secrets.token_bytes(16)
+        stored_hash = get_stored_password_hash()
 
-        # Encrypt file
-        ciphertext, tag, nonce = encrypt_file(file_path, aes_key, iv)
-        
-        # Write encrypted files
-        encrypted_file_path = file_path + '.enc'
-        tag_file_path = file_path + ".enc.tag"
-        nonce_file_path = file_path + ".enc.nonce"
-        try:
-            with open(encrypted_file_path, 'wb') as enc_file:
-                enc_file.write(ciphertext)
-            with open(tag_file_path, 'wb') as tag_file:
-                tag_file.write(tag)
-            with open(nonce_file_path, 'wb') as nonce_file:
-                nonce_file.write(nonce)
+        if stored_hash is None:
+            print("No password set up. Restarting program for setup...")
+            main()  # Restart the program to set up password
+            return
 
-            secure_delete(file_path)
-        except Exception as e:
-            print(f"Error encrypting {file_path}: {e}")
+        attempts = 0
+        while attempts < 3:
+            account_password = getpass.getpass("Enter your account password: ")
+            
+            if check_password(stored_hash, account_password):
+                main_key = prompt_for_main_key()
+                animation_thread = start_loading_animation("Encrypting files")
+                
+                try:
+                    ciphertext, tag, nonce = encrypt_aes_key_and_iv(aes_key, iv, main_key)
+                    keys_dir = os.path.join(directory, 'keys_ivs')
+                    os.makedirs(keys_dir, exist_ok=True)
 
-            # Cleanup partial files if an error occurs
-            for temp_file in [encrypted_file_path, tag_file_path, nonce_file_path]:
-                if os.path.exists(temp_file):
-                    os.remove(temp_file)
-            raise e
+                    salt = secrets.token_bytes(16)
+                    store_salt(salt)
 
-    # Encrypt the keys_ivs directory using account password
-    encrypt_directory_with_password(keys_dir, account_password)
+                    with open(os.path.join(keys_dir, 'encrypted_keys_ivs.bin'), 'wb') as f:
+                        f.write(ciphertext)
+                        f.write(tag)
+                        f.write(nonce)
+                    
+                    for filename in os.listdir(directory):
+                        file_path = os.path.join(directory, filename)
+                        if filename in ["main.py", "decrypt.py", "utils.py", "keys_ivs", "password_hash.bin", "SuprSafe.exe"] or os.path.isdir(file_path):
+                            #print(f"Skipping {filename}") # Debugging
+                            continue
 
-    create_message_window("Encryption completed! Don't lose your main key or account password.")
+                        # Encrypt file
+                        ciphertext, tag, nonce = encrypt_file(file_path, aes_key, iv)
+                        
+                        # Write encrypted files
+                        encrypted_file_path = file_path + '.enc'
+                        tag_file_path = file_path + ".enc.tag"
+                        nonce_file_path = file_path + ".enc.nonce"
+                        try:
+                            with open(encrypted_file_path, 'wb') as enc_file:
+                                enc_file.write(ciphertext)
+                            with open(tag_file_path, 'wb') as tag_file:
+                                tag_file.write(tag)
+                            with open(nonce_file_path, 'wb') as nonce_file:
+                                nonce_file.write(nonce)
+
+                            secure_delete(file_path)
+                        except Exception as e:
+                            print(f"Error encrypting {file_path}: {e}")
+
+                            # Cleanup partial files if an error occurs
+                            for temp_file in [encrypted_file_path, tag_file_path, nonce_file_path]:
+                                if os.path.exists(temp_file):
+                                    os.remove(temp_file)
+                            raise e
+
+                    # Encrypt the keys_ivs directory using account password
+                    encrypt_directory_with_password(keys_dir, account_password)
+
+                    stop_loading_animation(animation_thread)
+                    create_message_window("Encryption completed! Don't lose your main key or account password.")
+                    return
+                except Exception as e:
+                    print(f"Error during encryption: {e}")
+                finally:
+                    stop_loading_animation(animation_thread)
+                return
+            
+            attempts += 1
+            if attempts < 3:
+                print(f"Invalid password. {3 - attempts} attempt(s) remaining.")
+            else:
+                print("Too many failed attempts. Exiting.")
+                sys.exit(1)
+                
+    except Exception as e:
+        print(f"\nEncryption error: {e}")
+    finally:
+        cleanup_temp_state(directory)
 
 # Encrypt the keys_ivs directory with the account password
 def encrypt_directory_with_password(directory, password):
@@ -149,21 +184,19 @@ def encrypt_directory_with_password(directory, password):
 
 # Function that is called upon launching program
 def main():
-    # Display the welcome message
     print("Welcome to SuprSafe!\n")
-
-    # Check if account password is set up
     setup_password()
 
-    # Ask the user for the mode: 'e' for encryption or 'd' for decryption
     action = input("Choose action: (e) Encrypt or (d) Decrypt: ").strip().lower()
 
-    if action == 'e':
-        current_dir = os.getcwd()
-        encrypt_files_in_directory(current_dir)
-    elif action == 'd':
-        current_dir = os.getcwd()
-        decrypt_files_in_directory(current_dir)
+    if action in ['e', 'd']:
+        # Get directory from user instead of using current directory
+        directory = get_directory_from_user()
+        
+        if action == 'e':
+            encrypt_files_in_directory(directory)
+        else:
+            decrypt_files_in_directory(directory)
     else:
         print("Invalid choice. Please choose 'e' for encryption or 'd' for decryption.")
         return

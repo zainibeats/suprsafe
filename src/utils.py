@@ -1,16 +1,23 @@
+# type: ignore
 import os
 import random
 import sys
-import bcrypt
+import hashlib
 import tkinter as tk
 from tkinter import simpledialog
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from tkinter import filedialog
+import threading
+import time
 
 # File where the password hash will be stored
 PASSWORD_FILE = "password_hash.bin"
+
+# Global animation flag
+_stop_animation = False
 
 # Derives a key from a password using PBKDF2HMAC
 def derive_key(password, salt, iterations, key_len):
@@ -25,13 +32,27 @@ def derive_key(password, salt, iterations, key_len):
 # Hash the password using bcrypt
 def create_password_hash(password):
     password = password.encode()
-    hashed = bcrypt.hashpw(password, bcrypt.gensalt())
-    return hashed
+    salt = os.urandom(32)  # Generate a 32-byte salt
+    hash_obj = hashlib.pbkdf2_hmac(
+        'sha256',
+        password,
+        salt,
+        100000  # Number of iterations
+    )
+    # Store salt and hash together
+    return salt + hash_obj
 
 # Check if the entered password matches the stored hash
 def check_password(stored_hash, password):
-    password = password.encode()
-    return bcrypt.checkpw(password, stored_hash)
+    salt = stored_hash[:32]  # First 32 bytes are salt
+    stored_hash = stored_hash[32:]  # Rest is the hash
+    hash_obj = hashlib.pbkdf2_hmac(
+        'sha256',
+        password.encode(),
+        salt,
+        100000  # Same number of iterations as above
+    )
+    return hash_obj == stored_hash
 
 # On first startup, set a password for the user
 def set_password():
@@ -140,7 +161,9 @@ def prompt_for_main_key():
     root.attributes("-topmost", 1) # Set the window to always stay on top
     while True:
         key = simpledialog.askstring("Main Key", "Enter 32-byte main key:")
-        if len(key) != 32:
+        if key is None:  # User clicked Cancel
+            sys.exit(0)
+        if key and len(key) != 32:  # Only show error if key was provided but invalid
             print("Error: The main key must be exactly 32 characters long. Please try again.")
             continue
         return key.encode()
@@ -159,5 +182,69 @@ def decrypt_aes_key_and_iv(ciphertext, tag, nonce, main_key):
     if len(iv) != 16:
         raise ValueError(f"Invalid IV length: {len(iv)} bytes (expected 16 bytes)")
 
-    print(f"Decrypted AES Key Length: {len(aes_key)} bytes")
+    #print(f"Decrypted AES Key Length: {len(aes_key)} bytes") # Debugging
     return aes_key, iv
+
+# Add this new function to utils.py
+def get_directory_from_user():
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+    root.attributes("-topmost", 1)
+    
+    directory = filedialog.askdirectory(
+        title="Select Directory",
+        initialdir=os.getcwd()  # Start from current directory
+    )
+    
+    if not directory:  # If user cancels selection
+        print("\nDirectory selection cancelled. Exiting program.")
+        sys.exit(0)  # Exit cleanly
+    
+    return directory
+
+def animate_loading(message="Processing"):
+    global _stop_animation
+    dots = 1
+    while not _stop_animation:
+        print(f"\r{message}{'.' * dots}", end='', flush=True)
+        dots = (dots % 3) + 1
+        time.sleep(0.5)
+
+def start_loading_animation(message="Processing"):
+    global _stop_animation
+    _stop_animation = False
+    animation_thread = threading.Thread(target=lambda: animate_loading(message))
+    animation_thread.daemon = True
+    animation_thread.start()
+    return animation_thread
+
+def stop_loading_animation(thread):
+    global _stop_animation
+    _stop_animation = True
+    thread.join(timeout=1)
+    print('\r' + ' ' * 50 + '\r', end='', flush=True)  # Clear the animation line
+
+# Add these new functions
+def create_temp_state(operation_type, directory):
+    """Creates a temporary state file with minimal info"""
+    state_file = os.path.join(os.path.dirname(directory), '.suprsafe_temp')
+    try:
+        with open(state_file, 'w') as f:
+            f.write(f"{operation_type}:{directory}")
+    except Exception:
+        pass  # Fail silently for security
+
+def cleanup_temp_state(directory):
+    """Removes the temporary state file"""
+    state_file = os.path.join(os.path.dirname(directory), '.suprsafe_temp')
+    try:
+        if os.path.exists(state_file):
+            secure_delete(state_file)
+    except Exception:
+        pass  # Fail silently for security
+
+def handle_interrupt(directory):
+    """Cleanup handler for interrupts"""
+    print("\n\nOperation interrupted. Cleaning up...")
+    cleanup_temp_state(directory)
+    sys.exit(1)
