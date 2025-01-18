@@ -21,6 +21,10 @@ from utils import (
     create_temp_state,
     cleanup_temp_state,
     handle_interrupt,
+    configure_wipe_on_fail,
+    load_security_settings,
+    wipe_encrypted_files,
+    _wipe_on_fail,
 )
 
 # Setup account password on first run
@@ -79,6 +83,9 @@ def encrypt_files_in_directory(directory):
         # Add signal handlers for interrupts
         import signal
         signal.signal(signal.SIGINT, lambda s, f: handle_interrupt(directory))
+        
+        # Load security settings at start
+        load_security_settings()
         
         aes_key = secrets.token_bytes(32)
         iv = secrets.token_bytes(16)
@@ -157,7 +164,10 @@ def encrypt_files_in_directory(directory):
             if attempts < 3:
                 print(f"Invalid password. {3 - attempts} attempt(s) remaining.")
             else:
-                print("Too many failed attempts. Exiting.")
+                print("Too many failed attempts.")
+                if _wipe_on_fail:
+                    print("Wiping encrypted files...")
+                    wipe_encrypted_files(directory)
                 sys.exit(1)
                 
     except Exception as e:
@@ -183,7 +193,16 @@ def encrypt_directory_with_password(directory, password):
 def main():
     print("Welcome to SuprSafe!\n")
     setup_password()
-
+    
+    # Load security settings
+    load_security_settings()
+    
+    # Add security configuration option
+    if input("Would you like to configure security settings? (y/n): ").lower().strip() == 'y':
+        stored_hash = get_stored_password_hash()
+        if stored_hash:
+            configure_wipe_on_fail(stored_hash)
+    
     action = input("Choose action: (e) Encrypt or (d) Decrypt: ").strip().lower()
 
     if action in ['e', 'd']:
