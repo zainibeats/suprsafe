@@ -1,6 +1,7 @@
 import os
 import getpass
 import sys
+import signal
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -21,14 +22,11 @@ from utils import (
     cleanup_temp_state,
     handle_interrupt,
     wipe_encrypted_files,
-    _wipe_on_fail,
     load_security_settings,
+    security_settings,
 )
-import threading
-import time
-import signal
 
-# Decrypt keys directory using account password
+# Decrypt keys_ivs directory using derived key from account password
 def decrypt_keys_ivs_directory(directory, password):
     directory = os.path.join(directory, 'keys_ivs')
     salt = get_stored_salt()
@@ -43,7 +41,7 @@ def decrypt_keys_ivs_directory(directory, password):
     print("Directory decrypted and password verified!")
     return derived_key
 
-# Decrypt a single file using AES-GCM
+# Decrypt single file using AES-GCM with provided key, IV, tag, and nonce
 def decrypt_file(file_path, aes_key, iv, tag, nonce):
     with open(file_path, 'rb') as f:
         ciphertext = f.read()
@@ -56,7 +54,7 @@ def decrypt_file(file_path, aes_key, iv, tag, nonce):
         print(f"Decryption Error: {e}")
         return None
 
-# Decrypt all files in selected directory
+# Main decryption function - handles directory selection, password verification, and file decryption
 def decrypt_files_in_directory(directory):
     animation_thread = None
     try:
@@ -157,7 +155,7 @@ def decrypt_files_in_directory(directory):
                     stop_loading_animation(animation_thread)
                     
                     # Create a message window to inform the user that the files are now decrypted
-                    create_message_window("Your files are now decrypted. Don't lose your main key or account password.")
+                    create_message_window("Your files are now decrypted.")
                     return # Exit the function after successful decryption
                 
                 # If the encrypted keys file is not found, print an error message and exit the function
@@ -172,7 +170,7 @@ def decrypt_files_in_directory(directory):
                 print(f"Invalid password. {3 - attempts} attempt(s) remaining.")
             else:
                 print("Too many failed attempts.")
-                if _wipe_on_fail:
+                if security_settings['wipe_on_fail']:
                     print("Wiping encrypted files...")
                     wipe_encrypted_files(directory)
                 sys.exit(1)
