@@ -14,6 +14,7 @@
 - **Password Protection:** SuprSafe safeguards your encryption keys with a user-defined password, ensuring an additional layer of security.
 - **Key Generator Tool**: A separate utility (`main_key.py`) to generate secure 32-character main keys. Simply run the tool and press Enter to generate new keys, or 'q' to quit. Generated keys are suitable for use with SuprSafe's encryption process.
 - **Optional Executable**: SuprSafe can be run as an executable (`SuprSafe.exe`) for easier access, included in the release on GitHub.
+- **SuprSafe+ Mode**: An optional security feature that wipes encrypted files after too many failed password attempts.
 
 ## Requirements
 
@@ -40,6 +41,7 @@ pip install cryptography
 ```bash
 python main.py
 ```
+
 Alternatively, you can download the compiled executable (SuprSafe.exe) from the GitHub releases page and run it directly without needing to install Python or dependencies.
 
 ## Usage
@@ -48,20 +50,20 @@ Once you run the program (either via the Python script or the executable), you w
 
 **Encrypting Files:**
 
-1. Place the SuprSafe.exe or .py files in the directory you want all files to be encrypted at
-2. Run the program and choose (e) option to encrypt files - you will be asked to create an account password on first launch. After this, you will be prompted for that password **after** choosing encrypt / decrypt option in the CLI
-3. Enter your main key (32 character alphanumeric string) SuprSafe will use this to encrypt the randomly generated AES key and IV.
-4. The encrypted files will be saved with extensions like `.enc`, `.enc.tag`, and `.enc.nonce` to indicate their encrypted state
-5. Your files are now encrypted - **DO NOT REMOVE ANY FILES ADDED BY THE SUPRSAFE**
+1. Place the SuprSafe.exe or .py files in the directory you want all files to be encrypted at.
+2. Run the program and choose the (e) option to encrypt files - you will be asked to create an account password on first launch. After this, you will be prompted for that password **after** choosing the encrypt/decrypt option in the CLI.
+3. Enter your main key (32-character alphanumeric string). SuprSafe will use this to encrypt the randomly generated AES key and IV.
+4. The encrypted files will be saved with extensions like `.enc`, `.enc.tag`, and `.enc.nonce` to indicate their encrypted state.
+5. Your files are now encrypted - **DO NOT REMOVE ANY FILES ADDED BY THE SUPRSAFE**.
 
 **Decrypting Files:**
 
-1. Place the SuprSafe.exe or .py files in the directory you want all files to be decrypted at (if not already there)
-2. Run the program and choose (d) option to decrypt files
-3. Enter the account password created upon first launch
-3. Provide the main key you used during the encryption process
-4. The program will decrypt the selected files and restore them with their original filenames.
-5. SuprSafe securely deletes the encrypted files after successful decryption, eliminating any potential data remnants.
+1. Place the SuprSafe.exe or .py files in the directory you want all files to be decrypted at (if not already there).
+2. Run the program and choose the (d) option to decrypt files.
+3. Enter the account password created upon first launch.
+4. Provide the main key you used during the encryption process.
+5. The program will decrypt the selected files and restore them with their original filenames.
+6. SuprSafe securely deletes the encrypted files after successful decryption, eliminating any potential data remnants.
 
 ## CLI Menu
 
@@ -77,11 +79,15 @@ Please choose an option:
 
 **Password Safety:**
 
-- Exercise caution and select a complex and memorable account password. For the main key, ensure you store off of any digital devices for ultimate security. Losing this password **or** main key will render your encrypted files inaccessible as there's no way to recover them. Consider using password management tools to store your password securely.
+- Exercise caution and select a complex and memorable account password. For the main key, ensure you store it off of any digital devices for ultimate security. Losing this password **or** main key will render your encrypted files inaccessible as there's no way to recover them. Consider using password management tools to store your password securely.
 
 **Secure Deletion:**
 
 - SuprSafe prioritizes security by using secure methods to eliminate the original files after encryption or decryption. This guarantees that no traces of sensitive data remain.
+
+**SuprSafe+ Mode:**
+
+- This optional feature enhances security by wiping encrypted files after too many failed password attempts. You can configure this mode during the initial setup or later through the program's interface. SuprSafe+ Mode requires an administrator password, which is separate from your account password. This admin password controls security settings and should be different from your account password to ensure maximum security.
 
 ## License
 
