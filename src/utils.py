@@ -22,7 +22,13 @@ _stop_animation = False
 
 # Global security settings
 SECURITY_CONFIG_FILE = "security_config.bin"
-_wipe_on_fail = False  # Default to False for safety
+security_settings = {
+    'wipe_on_fail': False  # Default to False for safety
+}
+
+# Add new constants for SuprSafe+ settings
+SUPRSAFE_PLUS_PASSWORD_FILE = "suprsafe_plus.bin"
+_wipe_on_fail = False
 
 # Derives a key from a password using PBKDF2HMAC
 def derive_key(password, salt, iterations, key_len):
@@ -190,7 +196,7 @@ def prompt_for_main_key(check_existing=False, existing_key_data=None, directory=
     root.attributes("-topmost", 1)
     
     attempts = 0
-    while attempts < 3:
+    while attempts < 5:
         key = simpledialog.askstring("Main Key", "Enter 32-byte main key:")
         
         if key is None:  # User clicked Cancel
@@ -218,12 +224,12 @@ def prompt_for_main_key(check_existing=False, existing_key_data=None, directory=
                 return encoded_key  # Key is correct
             except Exception:
                 attempts += 1
-                if attempts < 3:
-                    print(f"Invalid main key. {3 - attempts} attempt(s) remaining.")
+                if attempts < 5:
+                    print(f"Invalid main key. {5 - attempts} attempt(s) remaining.")
                     continue
                 else:
                     print("Too many failed attempts.")
-                    if _wipe_on_fail:
+                    if security_settings['wipe_on_fail']:
                         print("Wiping encrypted files...")
                         wipe_encrypted_files(directory)
                     sys.exit(1)
@@ -292,26 +298,57 @@ def stop_loading_animation(thread):
     thread.join(timeout=1)
     print('\r' + ' ' * 50 + '\r', end='', flush=True)  # Clear the animation line
 
-# Configure wipe-on-fail security feature
-def configure_wipe_on_fail(stored_hash):
-    global _wipe_on_fail
+# Set up SuprSafe+ admin password
+def setup_suprsafe_plus_password():
+    print("\nSet up SuprSafe+ administrator password")
+    print("WARNING: This password controls security settings and should be different from your account password")
+    password = getpass.getpass("Enter SuprSafe+ admin password: ")
+    confirm = getpass.getpass("Confirm SuprSafe+ admin password: ")
+    
+    if password != confirm:
+        print("Passwords do not match. Please try again.")
+        return setup_suprsafe_plus_password()
+    
+    password_hash = create_password_hash(password)
+    with open(SUPRSAFE_PLUS_PASSWORD_FILE, 'wb') as f:
+        f.write(password_hash)
+    print("SuprSafe+ admin password set successfully.")
+
+# Get stored SuprSafe+ password hash
+def get_stored_suprsafe_plus_hash():
+    if os.path.exists(SUPRSAFE_PLUS_PASSWORD_FILE):
+        with open(SUPRSAFE_PLUS_PASSWORD_FILE, 'rb') as f:
+            return f.read()
+    return None
+
+# Configure wipe-on-fail with separate admin password
+def configure_wipe_on_fail():
+    stored_hash = get_stored_suprsafe_plus_hash()
+    
+    if stored_hash is None:
+        print("No SuprSafe+ admin password set.")
+        setup_suprsafe_plus_password()
+        stored_hash = get_stored_suprsafe_plus_hash()
+    
     attempts = 0
     while attempts < 3:
-        password = getpass.getpass("Enter your account password to modify security settings: ")
+        password = getpass.getpass("Enter SuprSafe+ admin password: ")
         if check_password(stored_hash, password):
-            choice = input("Enable delete files on too many failed attempts? (y/n): ").lower().strip()
-            _wipe_on_fail = choice == 'y'
+            choice = input("Enable SuprSafe+ Mode (wipe files on failed attempts)? (y/n): ").lower().strip()
+            previous_state = security_settings['wipe_on_fail']
+            security_settings['wipe_on_fail'] = choice == 'y'
             
-            # Store the setting securely
             try:
                 with open(SECURITY_CONFIG_FILE, 'wb') as f:
-                    # Store setting with password hash to prevent tampering
-                    setting_bytes = bytes([int(_wipe_on_fail)])
+                    setting_bytes = bytes([int(security_settings['wipe_on_fail'])])
                     f.write(setting_bytes)
-                print(f"Security setting {'enabled' if _wipe_on_fail else 'disabled'} successfully.")
+                    f.flush()
+                    os.fsync(f.fileno())
+                print(f"SuprSafe+ Mode {'enabled' if security_settings['wipe_on_fail'] else 'disabled'} successfully.")
                 return True
             except Exception:
                 print("Error saving security settings.")
+                security_settings['wipe_on_fail'] = previous_state
                 return False
                 
         attempts += 1
@@ -321,16 +358,35 @@ def configure_wipe_on_fail(stored_hash):
     print("Too many failed attempts. Exiting.")
     sys.exit(1)
 
+# Initialize security settings on first run
+def initialize_security_settings():
+    if not os.path.exists(SECURITY_CONFIG_FILE):
+        try:
+            with open(SECURITY_CONFIG_FILE, 'wb') as f:
+                # Initialize to disabled (0)
+                f.write(bytes([0]))
+                f.flush()  # Force write to disk
+                os.fsync(f.fileno())  # Ensure it's written to disk
+        except Exception:
+            print("WARNING: Could not initialize security settings.")
+            # Don't modify _wipe_on_fail, maintain secure state
+
 # Load security settings
 def load_security_settings():
-    global _wipe_on_fail
     try:
         if os.path.exists(SECURITY_CONFIG_FILE):
             with open(SECURITY_CONFIG_FILE, 'rb') as f:
                 setting_bytes = f.read(1)
-                _wipe_on_fail = bool(int.from_bytes(setting_bytes, 'big'))
+                if setting_bytes:  # Make sure we have data
+                    security_settings['wipe_on_fail'] = bool(setting_bytes[0])
+                else:
+                    print("WARNING: Security settings file is corrupted.")
+                    print("For security reasons, maintaining previous SuprSafe+ Mode state.")
+        else:
+            initialize_security_settings()
     except Exception:
-        _wipe_on_fail = False  # Default to safe setting on error
+        print("WARNING: Error reading security settings.")
+        print("For security reasons, maintaining previous SuprSafe+ Mode state.")
 
 # Wipe encrypted files in directory
 def wipe_encrypted_files(directory):
