@@ -12,12 +12,17 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from tkinter import filedialog
 import threading
 import time
+import getpass
 
 # File where the password hash will be stored
 PASSWORD_FILE = "password_hash.bin"
 
 # Global animation flag
 _stop_animation = False
+
+# Global security settings
+SECURITY_CONFIG_FILE = "security_config.bin"
+_wipe_on_fail = False  # Default to False for safety
 
 # Derives a key from a password using PBKDF2HMAC
 def derive_key(password, salt, iterations, key_len):
@@ -217,7 +222,10 @@ def prompt_for_main_key(check_existing=False, existing_key_data=None, directory=
                     print(f"Invalid main key. {3 - attempts} attempt(s) remaining.")
                     continue
                 else:
-                    print("Too many failed attempts. Exiting.")
+                    print("Too many failed attempts.")
+                    if _wipe_on_fail:
+                        print("Wiping encrypted files...")
+                        wipe_encrypted_files(directory)
                     sys.exit(1)
         else:
             return encoded_key  # New key, no verification needed
@@ -283,3 +291,68 @@ def stop_loading_animation(thread):
     _stop_animation = True
     thread.join(timeout=1)
     print('\r' + ' ' * 50 + '\r', end='', flush=True)  # Clear the animation line
+
+# Configure wipe-on-fail security feature
+def configure_wipe_on_fail(stored_hash):
+    global _wipe_on_fail
+    attempts = 0
+    while attempts < 3:
+        password = getpass.getpass("Enter your account password to modify security settings: ")
+        if check_password(stored_hash, password):
+            choice = input("Enable delete files on too many failed attempts? (y/n): ").lower().strip()
+            _wipe_on_fail = choice == 'y'
+            
+            # Store the setting securely
+            try:
+                with open(SECURITY_CONFIG_FILE, 'wb') as f:
+                    # Store setting with password hash to prevent tampering
+                    setting_bytes = bytes([int(_wipe_on_fail)])
+                    f.write(setting_bytes)
+                print(f"Security setting {'enabled' if _wipe_on_fail else 'disabled'} successfully.")
+                return True
+            except Exception:
+                print("Error saving security settings.")
+                return False
+                
+        attempts += 1
+        if attempts < 3:
+            print(f"Invalid password. {3 - attempts} attempt(s) remaining.")
+    
+    print("Too many failed attempts. Exiting.")
+    sys.exit(1)
+
+# Load security settings
+def load_security_settings():
+    global _wipe_on_fail
+    try:
+        if os.path.exists(SECURITY_CONFIG_FILE):
+            with open(SECURITY_CONFIG_FILE, 'rb') as f:
+                setting_bytes = f.read(1)
+                _wipe_on_fail = bool(int.from_bytes(setting_bytes, 'big'))
+    except Exception:
+        _wipe_on_fail = False  # Default to safe setting on error
+
+# Wipe encrypted files in directory
+def wipe_encrypted_files(directory):
+    try:
+        for filename in os.listdir(directory):
+            if filename.endswith('.enc'):
+                file_path = os.path.join(directory, filename)
+                base_file_path = file_path[:-4]
+                tag_file_path = base_file_path + ".enc.tag"
+                nonce_file_path = base_file_path + ".enc.nonce"
+                
+                # Securely delete all related files
+                for f in [file_path, tag_file_path, nonce_file_path]:
+                    if os.path.exists(f):
+                        secure_delete(f)
+        
+        # Also remove the keys directory
+        keys_dir = os.path.join(directory, 'keys_ivs')
+        if os.path.exists(keys_dir):
+            for f in os.listdir(keys_dir):
+                secure_delete(os.path.join(keys_dir, f))
+            os.rmdir(keys_dir)
+            
+    except Exception as e:
+        print(f"Error during secure wipe: {e}")
