@@ -50,20 +50,22 @@ Once you run the program (either via the Python script or the executable), you w
 
 **Encrypting Files:**
 
-1. Place the SuprSafe.exe or .py files in the directory you want all files to be encrypted at.
-2. Run the program and choose the (e) option to encrypt files - you will be asked to create an account password on first launch. After this, you will be prompted for that password **after** choosing the encrypt/decrypt option in the CLI.
-3. Enter your main key (32-character alphanumeric string). SuprSafe will use this to encrypt the randomly generated AES key and IV.
-4. The encrypted files will be saved with extensions like `.enc`, `.enc.tag`, and `.enc.nonce` to indicate their encrypted state.
-5. Your files are now encrypted - **DO NOT REMOVE ANY FILES ADDED BY THE SUPRSAFE**.
+1. Run the SuprSafe executable or Python script from its current location. Alternatively, you can create a shortcut of the executable and place it in a convenient location for easy access.
+2. Choose the (e) option to encrypt files - you will be asked to create an account password on first launch. After this, you will be prompted for that password **after** choosing the encrypt/decrypt option in the CLI.
+3. Enter the directory path where you want the files to be encrypted.
+4. Enter your main key (32-character alphanumeric string). SuprSafe will use this to encrypt the randomly generated AES key and IV.
+5. The encrypted files will be saved with extensions like `.enc`, `.enc.tag`, and `.enc.nonce` to indicate their encrypted state.
+6. Your files are now encrypted - **DO NOT REMOVE ANY FILES ADDED BY THE SUPRSAFE**.
 
 **Decrypting Files:**
 
-1. Place the SuprSafe.exe or .py files in the directory you want all files to be decrypted at (if not already there).
-2. Run the program and choose the (d) option to decrypt files.
-3. Enter the account password created upon first launch.
-4. Provide the main key you used during the encryption process.
-5. The program will decrypt the selected files and restore them with their original filenames.
-6. SuprSafe securely deletes the encrypted files after successful decryption, eliminating any potential data remnants.
+1. Run the SuprSafe executable or Python script from its current location. Alternatively, use a shortcut for easy access.
+2. Choose the (d) option to decrypt files.
+3. Enter the directory path where the encrypted files are located.
+4. Enter the account password created upon first launch.
+5. Provide the main key you used during the encryption process.
+6. The program will decrypt the selected files and restore them with their original filenames.
+7. SuprSafe securely deletes the encrypted files after successful decryption, eliminating any potential data remnants.
 
 ## CLI Menu
 
