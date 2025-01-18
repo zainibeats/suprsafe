@@ -24,15 +24,15 @@ from utils import (
     configure_wipe_on_fail,
     load_security_settings,
     wipe_encrypted_files,
-    _wipe_on_fail,
+    security_settings,
 )
 
-# Setup account password on first run
+# Initialize account password on first program run
 def setup_password():
     if not os.path.exists("password_hash.bin"):
         set_password()
 
-# Verify account password with 3 attempts
+# Verify account password with 3-attempt limit
 def prompt_for_password():
     stored_hash = get_stored_password_hash()
 
@@ -53,7 +53,7 @@ def prompt_for_password():
     print("Too many failed attempts. Exiting.")
     sys.exit(1)
 
-# Encrypt AES key and IV using main key with GCM mode
+# Encrypt AES key and IV pair using main key with GCM mode
 def encrypt_aes_key_and_iv(aes_key, iv, main_key):
     nonce = os.urandom(16)
     cipher = Cipher(algorithms.AES(main_key), modes.GCM(nonce), backend=default_backend())
@@ -63,7 +63,7 @@ def encrypt_aes_key_and_iv(aes_key, iv, main_key):
     tag = encryptor.tag
     return ciphertext, tag, nonce
 
-# Encrypt a single file using AES-GCM
+# Encrypt single file using AES-GCM with provided key and IV
 def encrypt_file(file_path, aes_key, iv):
     nonce = os.urandom(16)
     cipher = Cipher(algorithms.AES(aes_key), modes.GCM(nonce), backend=default_backend())
@@ -75,7 +75,7 @@ def encrypt_file(file_path, aes_key, iv):
     
     return ciphertext, tag, nonce
 
-# Encrypt all files in selected directory
+# Main encryption function - handles directory selection, password verification, and file encryption
 def encrypt_files_in_directory(directory):
     animation_thread = None
     try:
@@ -165,7 +165,7 @@ def encrypt_files_in_directory(directory):
                 print(f"Invalid password. {3 - attempts} attempt(s) remaining.")
             else:
                 print("Too many failed attempts.")
-                if _wipe_on_fail:
+                if security_settings['wipe_on_fail']:
                     print("Wiping encrypted files...")
                     wipe_encrypted_files(directory)
                 sys.exit(1)
@@ -175,7 +175,7 @@ def encrypt_files_in_directory(directory):
     finally:
         cleanup_temp_state(directory)
 
-# Encrypt keys directory with account password
+# Encrypt keys_ivs directory using derived key from account password
 def encrypt_directory_with_password(directory, password):
     salt = secrets.token_bytes(16)
     store_salt(salt)
@@ -189,7 +189,7 @@ def encrypt_directory_with_password(directory, password):
     )
     derived_key = kdf.derive(password.encode())
 
-# Main program entry point
+# Main program entry point - handles user interaction and operation selection
 def main():
     print("Welcome to SuprSafe!\n")
     setup_password()
@@ -197,12 +197,14 @@ def main():
     # Load security settings
     load_security_settings()
     
-    # Add security configuration option
-    if input("Would you like to configure security settings? (y/n): ").lower().strip() == 'y':
-        stored_hash = get_stored_password_hash()
-        if stored_hash:
-            configure_wipe_on_fail(stored_hash)
-    
+    if security_settings['wipe_on_fail']:
+        print("SuprSafe+ Mode: ENABLED")
+    else:
+        print("SuprSafe+ Mode: DISABLED")
+
+    if input("Would you like to configure SuprSafe+ Mode? (y/n): ").lower().strip() == 'y':
+        configure_wipe_on_fail()
+
     action = input("Choose action: (e) Encrypt or (d) Decrypt: ").strip().lower()
 
     if action in ['e', 'd']:
