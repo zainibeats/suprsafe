@@ -20,6 +20,9 @@ from utils import (
     create_temp_state,
     cleanup_temp_state,
     handle_interrupt,
+    wipe_encrypted_files,
+    _wipe_on_fail,
+    load_security_settings,
 )
 import threading
 import time
@@ -60,6 +63,9 @@ def decrypt_files_in_directory(directory):
         create_temp_state('decrypt', directory)
         # Add signal handlers for interrupts
         signal.signal(signal.SIGINT, lambda s, f: handle_interrupt(directory))
+        
+        # Load security settings at start
+        load_security_settings()
         
         stored_hash = get_stored_password_hash()
         if stored_hash is None:
@@ -162,7 +168,14 @@ def decrypt_files_in_directory(directory):
             
             # If the password is incorrect, print an error message and increment the attempt counter
             attempts += 1
-            print(f"Invalid password. {3 - attempts} attempt(s) remaining.")
+            if attempts < 3:
+                print(f"Invalid password. {3 - attempts} attempt(s) remaining.")
+            else:
+                print("Too many failed attempts.")
+                if _wipe_on_fail:
+                    print("Wiping encrypted files...")
+                    wipe_encrypted_files(directory)
+                sys.exit(1)
 
         # If the user has made too many attempts, print an error message and exit the program
         print("Too many failed attempts. Exiting.")
