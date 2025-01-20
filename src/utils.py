@@ -13,22 +13,33 @@ from tkinter import filedialog
 import threading
 import time
 import getpass
+from colorama import init, Fore, Style
+import secrets
+
+# Initialize colorama
+init(autoreset=True)
+
+def get_data_dir():
+    """Get the path to the data directory, creating it if it doesn't exist."""
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+    os.makedirs(data_dir, exist_ok=True)
+    return data_dir
 
 # File where the password hash will be stored
-PASSWORD_FILE = "password_hash.bin"
+PASSWORD_FILE = os.path.join(get_data_dir(), "password_hash.bin")
 
 # Global animation flag
 _stop_animation = False
 
 # Global security settings
-SECURITY_CONFIG_FILE = "security_config.bin"
+SECURITY_CONFIG_FILE = os.path.join(get_data_dir(), "security_config.bin")
 security_settings = {
-    'wipe_on_fail': False  # Default to False for safety
+    'wipe_files_after_max_attempts': False  # If enabled, deletes all encrypted files after too many failed password/key attempts
 }
 
 # Add new constants for SuprSafe+ settings
-SUPRSAFE_PLUS_PASSWORD_FILE = "suprsafe_plus.bin"
-_wipe_on_fail = False
+SUPRSAFE_PLUS_PASSWORD_FILE = os.path.join(get_data_dir(), "suprsafe_plus.bin")
+_wipe_files_after_max_attempts = False # True = SuprSafe+ Mode enabled
 
 # Derives a key from a password using PBKDF2HMAC
 def derive_key(password, salt, iterations, key_len):
@@ -67,19 +78,25 @@ def check_password(stored_hash, password):
 
 # On first startup, set a password for the user
 def set_password():
-    password = input("Please set your account password: ")
-    confirm_password = input("Confirm your password: ")
+    while True:
+        password = input(f"{Fore.CYAN}Please set your account password: ")
+        if len(password) < 4:
+            print(f"{Fore.RED}Password must be at least 4 characters long.")
+            continue
+            
+        confirm_password = input(f"{Fore.CYAN}Confirm your password: ")
 
-    if password != confirm_password:
-        print("Passwords do not match. Please try again.")
-        return set_password()
-    
-    password_hash = create_password_hash(password)
+        if password != confirm_password:
+            print(f"{Fore.RED}Passwords do not match. Please try again.")
+            continue
+        
+        password_hash = create_password_hash(password)
 
-    with open(PASSWORD_FILE, 'wb') as f:
-        f.write(password_hash)
+        with open(PASSWORD_FILE, 'wb') as f:
+            f.write(password_hash)
 
-    print("Password set successfully.")
+        print(f"{Fore.GREEN}Password set successfully.")
+        break
 
 # Get the stored password hash from the file
 def get_stored_password_hash():
@@ -100,7 +117,7 @@ def store_salt(salt):
             f.write(salt)
         #print(f"Salt stored at {salt_path}") # Debugging
     except OSError as e:
-        print(f"Failed to write salt: {e}")
+        print(f"{Fore.RED}Failed to write salt: {e}")
         sys.exit(1)
 
 # Look for and read stored salt from program files
@@ -111,7 +128,7 @@ def get_stored_salt():
         with open(salt_path, 'rb') as f:
             return f.read()
     else:
-        print("Salt file not found. Ensure the program has run at least once to generate it.")
+        print(f"{Fore.RED}Salt file not found. Ensure the program has run at least once to generate it.")
         sys.exit(1)
 
 # Delete the old files after encryption/decryption
@@ -229,7 +246,7 @@ def prompt_for_main_key(check_existing=False, existing_key_data=None, directory=
                     continue
                 else:
                     print("Too many failed attempts.")
-                    if security_settings['wipe_on_fail']:
+                    if security_settings['wipe_files_after_max_attempts']:
                         print("Wiping encrypted files...")
                         wipe_encrypted_files(directory)
                     sys.exit(1)
@@ -241,20 +258,28 @@ def prompt_for_main_key(check_existing=False, existing_key_data=None, directory=
 
 # Decrypt aes key and iv with main key
 def decrypt_aes_key_and_iv(ciphertext, tag, nonce, main_key):
-    # Decrypt AES key with the main key using ECB mode
-    cipher = Cipher(algorithms.AES(main_key), modes.GCM(nonce, tag=tag), backend=default_backend())
-    decryptor = cipher.decryptor()
-    decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
+    try:
+        # Decrypt AES key with the main key using ECB mode
+        cipher = Cipher(algorithms.AES(main_key), modes.GCM(nonce, tag=tag), backend=default_backend())
+        decryptor = cipher.decryptor()
+        decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
 
-    # Extract AES key and IV
-    aes_key = decrypted_data[:32]  # First 32 bytes for AES key
-    iv = decrypted_data[32:48]    # Next 16 bytes for IV
+        # Extract AES key and IV
+        aes_key = decrypted_data[:32]  # First 32 bytes for AES key
+        iv = decrypted_data[32:48]    # Next 16 bytes for IV
 
-    if len(iv) != 16:
-        raise ValueError(f"Invalid IV length: {len(iv)} bytes (expected 16 bytes)")
+        if len(iv) != 16:
+            raise ValueError(f"Invalid IV length: {len(iv)} bytes (expected 16 bytes)")
 
-    #print(f"Decrypted AES Key Length: {len(aes_key)} bytes") # Debugging
-    return aes_key, iv
+        return aes_key, iv
+    finally:
+        # Securely wipe sensitive data
+        if 'decrypted_data' in locals():
+            secure_wipe(decrypted_data)
+        if 'cipher' in locals():
+            del cipher
+        if 'decryptor' in locals():
+            del decryptor
 
 # Add this new function to utils.py
 def get_directory_from_user():
@@ -262,23 +287,34 @@ def get_directory_from_user():
     root.withdraw()  # Hide the main window
     root.attributes("-topmost", 1)
     
-    directory = filedialog.askdirectory(
-        title="Select Directory",
-        initialdir=os.getcwd()  # Start from current directory
-    )
-    
-    if not directory:  # If user cancels selection
-        print("\nDirectory selection cancelled. Exiting program.")
-        sys.exit(0)  # Exit cleanly
-    
-    return directory
+    try:
+        directory = filedialog.askdirectory(
+            title="Select Directory",
+            initialdir=os.getcwd()  # Start from current directory
+        )
+        
+        # Force focus back to terminal
+        if os.name == 'nt':  # Windows
+            import win32gui
+            import win32con
+            hwnd = win32gui.GetForegroundWindow()
+            win32gui.ShowWindow(hwnd, win32con.SW_MINIMIZE)
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+        
+        if not directory:  # If user cancels selection
+            print(f"{Fore.YELLOW}No directory selected, returning to main menu.")
+            return None
+        
+        return directory
+    finally:
+        root.destroy()  # Ensure the root window is destroyed whether directory is selected or not
 
 # Loading animation
 def animate_loading(message="Processing"):
     global _stop_animation
     dots = 1
     while not _stop_animation:
-        print(f"\r{message}{'.' * dots}", end='', flush=True)
+        print(f"\r{Fore.CYAN}{message}{'.' * dots}", end='', flush=True)
         dots = (dots % 3) + 1
         time.sleep(0.5)
 
@@ -300,19 +336,26 @@ def stop_loading_animation(thread):
 
 # Set up SuprSafe+ admin password
 def setup_suprsafe_plus_password():
-    print("\nSet up SuprSafe+ administrator password")
-    print("WARNING: This password controls security settings and should be different from your account password")
-    password = getpass.getpass("Enter SuprSafe+ admin password: ")
-    confirm = getpass.getpass("Confirm SuprSafe+ admin password: ")
+    print(f"\n{Fore.CYAN}Set up SuprSafe+ administrator password")
+    print(f"{Fore.YELLOW}WARNING: This password controls security settings and should be different from your account password")
     
-    if password != confirm:
-        print("Passwords do not match. Please try again.")
-        return setup_suprsafe_plus_password()
-    
-    password_hash = create_password_hash(password)
-    with open(SUPRSAFE_PLUS_PASSWORD_FILE, 'wb') as f:
-        f.write(password_hash)
-    print("SuprSafe+ admin password set successfully.")
+    while True:
+        password = getpass.getpass(f"{Fore.CYAN}Enter SuprSafe+ admin password: ")
+        if len(password) < 4:
+            print(f"{Fore.RED}Password must be at least 4 characters long.")
+            continue
+            
+        confirm = getpass.getpass(f"{Fore.CYAN}Confirm SuprSafe+ admin password: ")
+        
+        if password != confirm:
+            print(f"{Fore.RED}Passwords do not match. Please try again.")
+            continue
+        
+        password_hash = create_password_hash(password)
+        with open(SUPRSAFE_PLUS_PASSWORD_FILE, 'wb') as f:
+            f.write(password_hash)
+        print(f"{Fore.GREEN}SuprSafe+ admin password set successfully.")
+        break
 
 # Get stored SuprSafe+ password hash
 def get_stored_suprsafe_plus_hash():
@@ -321,41 +364,41 @@ def get_stored_suprsafe_plus_hash():
             return f.read()
     return None
 
-# Configure wipe-on-fail with separate admin password
-def configure_wipe_on_fail():
+# Configure wipe-files-after-max-attempts with separate admin password
+def configure_wipe_files_after_max_attempts():
     stored_hash = get_stored_suprsafe_plus_hash()
     
     if stored_hash is None:
-        print("No SuprSafe+ admin password set.")
+        print(f"{Fore.RED}No SuprSafe+ admin password set.")
         setup_suprsafe_plus_password()
         stored_hash = get_stored_suprsafe_plus_hash()
     
     attempts = 0
     while attempts < 3:
-        password = getpass.getpass("Enter SuprSafe+ admin password: ")
+        password = getpass.getpass(f"{Fore.CYAN}Enter SuprSafe+ admin password: ")
         if check_password(stored_hash, password):
-            choice = input("Enable SuprSafe+ Mode (wipe files on failed attempts)? (y/n): ").lower().strip()
-            previous_state = security_settings['wipe_on_fail']
-            security_settings['wipe_on_fail'] = choice == 'y'
+            choice = input(f"{Fore.CYAN}Enable SuprSafe+ Mode (wipe files on failed attempts)? (y/n): ").lower().strip()
+            previous_state = security_settings['wipe_files_after_max_attempts']
+            security_settings['wipe_files_after_max_attempts'] = choice == 'y'
             
             try:
                 with open(SECURITY_CONFIG_FILE, 'wb') as f:
-                    setting_bytes = bytes([int(security_settings['wipe_on_fail'])])
+                    setting_bytes = bytes([int(security_settings['wipe_files_after_max_attempts'])])
                     f.write(setting_bytes)
                     f.flush()
                     os.fsync(f.fileno())
-                print(f"SuprSafe+ Mode {'enabled' if security_settings['wipe_on_fail'] else 'disabled'} successfully.")
+                print(f"{Fore.YELLOW}SuprSafe+ Mode {'enabled' if security_settings['wipe_files_after_max_attempts'] else 'disabled'} successfully.")
                 return True
             except Exception:
-                print("Error saving security settings.")
-                security_settings['wipe_on_fail'] = previous_state
+                print(f"{Fore.RED}Error saving security settings.")
+                security_settings['wipe_files_after_max_attempts'] = previous_state
                 return False
                 
         attempts += 1
         if attempts < 3:
-            print(f"Invalid password. {3 - attempts} attempt(s) remaining.")
+            print(f"{Fore.RED}Invalid password. {3 - attempts} attempt(s) remaining.")
     
-    print("Too many failed attempts. Exiting.")
+    print(f"{Fore.RED}Too many failed attempts. Exiting.")
     sys.exit(1)
 
 # Initialize security settings on first run
@@ -368,8 +411,8 @@ def initialize_security_settings():
                 f.flush()  # Force write to disk
                 os.fsync(f.fileno())  # Ensure it's written to disk
         except Exception:
-            print("WARNING: Could not initialize security settings.")
-            # Don't modify _wipe_on_fail, maintain secure state
+            print(f"{Fore.RED}WARNING: Could not initialize security settings.")
+            # Don't modify _wipe_files_after_max_attempts, maintain secure state
 
 # Load security settings
 def load_security_settings():
@@ -378,15 +421,15 @@ def load_security_settings():
             with open(SECURITY_CONFIG_FILE, 'rb') as f:
                 setting_bytes = f.read(1)
                 if setting_bytes:  # Make sure we have data
-                    security_settings['wipe_on_fail'] = bool(setting_bytes[0])
+                    security_settings['wipe_files_after_max_attempts'] = bool(setting_bytes[0])
                 else:
-                    print("WARNING: Security settings file is corrupted.")
-                    print("For security reasons, maintaining previous SuprSafe+ Mode state.")
+                    print(f"{Fore.RED}WARNING: Security settings file is corrupted.")
+                    print(f"{Fore.RED}For security reasons, maintaining previous SuprSafe+ Mode state.")
         else:
             initialize_security_settings()
     except Exception:
-        print("WARNING: Error reading security settings.")
-        print("For security reasons, maintaining previous SuprSafe+ Mode state.")
+        print(f"{Fore.RED}WARNING: Error reading security settings.")
+        print(f"{Fore.RED}For security reasons, maintaining previous SuprSafe+ Mode state.")
 
 # Wipe encrypted files in directory
 def wipe_encrypted_files(directory):
@@ -412,3 +455,20 @@ def wipe_encrypted_files(directory):
             
     except Exception as e:
         print(f"Error during secure wipe: {e}")
+
+def secure_wipe(data):
+    """Securely wipe sensitive data from memory."""
+    if isinstance(data, str):
+        length = len(data)
+        # Overwrite with random data
+        for _ in range(3):  # Multiple overwrite passes
+            for i in range(length):
+                data = data[:i] + chr(secrets.randbelow(256)) + data[i+1:]
+    elif isinstance(data, bytes):
+        length = len(data)
+        # Overwrite with random bytes
+        for _ in range(3):  # Multiple overwrite passes
+            for i in range(length):
+                data = data[:i] + bytes([secrets.randbelow(256)]) + data[i+1:]
+    
+    return None  # Ensure the data is not accidentally reused

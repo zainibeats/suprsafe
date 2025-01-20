@@ -6,9 +6,9 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
+from colorama import init, Fore, Style
 from decrypt import decrypt_files_in_directory
 from utils import (
-    create_message_window,
     secure_delete,
     prompt_for_main_key,
     set_password,
@@ -21,36 +21,34 @@ from utils import (
     create_temp_state,
     cleanup_temp_state,
     handle_interrupt,
-    configure_wipe_on_fail,
+    configure_wipe_files_after_max_attempts,
     load_security_settings,
     wipe_encrypted_files,
     security_settings,
 )
 
-# Initialize account password on first program run
-def setup_password():
-    if not os.path.exists("password_hash.bin"):
-        set_password()
+# Initialize colorama
+init(autoreset=True)
 
 # Verify account password with 3-attempt limit
 def prompt_for_password():
     stored_hash = get_stored_password_hash()
 
     if stored_hash is None:
-        print("No password set up. Exiting program.")
+        print(f"{Fore.RED}No password set up. Exiting program.")
         sys.exit(1)
 
     attempts = 0
     while attempts < 3:
-        password = input("Enter your account password: ")
+        password = getpass.getpass(f"{Fore.CYAN}Enter your account password: ")
 
         if check_password(stored_hash, password):
             return
     
         attempts += 1
-        print(f"Invalid password. {3 - attempts} attempt(s) remaining.")
+        print(f"{Fore.RED}Invalid password. {3 - attempts} attempt(s) remaining.")
 
-    print("Too many failed attempts. Exiting.")
+    print(f"{Fore.RED}Too many failed attempts. Exiting.")
     sys.exit(1)
 
 # Encrypt AES key and IV pair using main key with GCM mode
@@ -92,17 +90,17 @@ def encrypt_files_in_directory(directory):
         stored_hash = get_stored_password_hash()
 
         if stored_hash is None:
-            print("No password set up. Restarting program for setup...")
+            print(f"{Fore.RED}No password set up. Restarting program for setup...")
             main()  # Restart the program to set up password
             return
 
         attempts = 0
         while attempts < 3:
-            account_password = getpass.getpass("Enter your account password: ")
+            account_password = getpass.getpass(f"{Fore.CYAN}Enter your account password: ")
             
             if check_password(stored_hash, account_password):
                 main_key = prompt_for_main_key()
-                animation_thread = start_loading_animation("Encrypting files")
+                animation_thread = start_loading_animation(f"{Fore.CYAN}Encrypting files")
                 
                 try:
                     ciphertext, tag, nonce = encrypt_aes_key_and_iv(aes_key, iv, main_key)
@@ -119,7 +117,7 @@ def encrypt_files_in_directory(directory):
                     
                     for filename in os.listdir(directory):
                         file_path = os.path.join(directory, filename)
-                        if filename in ["main.py", "decrypt.py", "utils.py", "keys_ivs", "password_hash.bin", "SuprSafe.exe"] or os.path.isdir(file_path):
+                        if filename in ["main.py", "decrypt.py", "utils.py", "keys_ivs", "SuprSafe.exe"] or os.path.isdir(file_path):
                             #print(f"Skipping {filename}") # Debugging
                             continue
 
@@ -152,21 +150,21 @@ def encrypt_files_in_directory(directory):
                     encrypt_directory_with_password(keys_dir, account_password)
 
                     stop_loading_animation(animation_thread)
-                    create_message_window("Encryption completed! Don't lose your main key or account password.")
+                    print(f"{Fore.GREEN}Encryption completed successfully!")
                     return
                 except Exception as e:
-                    print(f"Error during encryption: {e}")
+                    print(f"{Fore.RED}Error during encryption: {e}")
                 finally:
                     stop_loading_animation(animation_thread)
                 return
             
             attempts += 1
             if attempts < 3:
-                print(f"Invalid password. {3 - attempts} attempt(s) remaining.")
+                print(f"{Fore.RED}Invalid password. {3 - attempts} attempt(s) remaining.")
             else:
-                print("Too many failed attempts.")
-                if security_settings['wipe_on_fail']:
-                    print("Wiping encrypted files...")
+                print(f"{Fore.RED}Too many failed attempts.")
+                if security_settings['wipe_files_after_max_attempts']:
+                    print(f"{Fore.RED}Wiping encrypted files...")
                     wipe_encrypted_files(directory)
                 sys.exit(1)
                 
@@ -191,33 +189,42 @@ def encrypt_directory_with_password(directory, password):
 
 # Main program entry point - handles user interaction and operation selection
 def main():
-    print("Welcome to SuprSafe!\n")
-    setup_password()
+    print(f"{Fore.CYAN}Welcome to SuprSafe!\n")
+    
+    # Only set up password if no password hash exists
+    if get_stored_password_hash() is None:
+        set_password()
     
     # Load security settings
     load_security_settings()
     
-    if security_settings['wipe_on_fail']:
-        print("SuprSafe+ Mode: ENABLED")
+    if security_settings['wipe_files_after_max_attempts']:
+        print(f"SuprSafe+ Mode: {Fore.GREEN}ENABLED")
     else:
-        print("SuprSafe+ Mode: DISABLED")
+        print(f"SuprSafe+ Mode: {Fore.RED}DISABLED")
 
-    if input("Would you like to configure SuprSafe+ Mode? (y/n): ").lower().strip() == 'y':
-        configure_wipe_on_fail()
+    if input(f"{Fore.CYAN}Would you like to configure SuprSafe+ Mode? (y/n): ").lower().strip() == 'y':
+        configure_wipe_files_after_max_attempts()
 
-    action = input("Choose action: (e) Encrypt or (d) Decrypt: ").strip().lower()
+    while True:  # Keep asking until valid input is received
+        action = input(f"{Fore.CYAN}Choose action: (e) Encrypt, (d) Decrypt: ").strip().lower()
 
-    if action in ['e', 'd']:
-        # Get directory from user instead of using current directory
-        directory = get_directory_from_user()
-        
-        if action == 'e':
-            encrypt_files_in_directory(directory)
+        if action == 'q':
+            print(f"{Fore.YELLOW}Exiting SuprSafe. Goodbye!")
+            sys.exit(0)
+        elif action in ['e', 'd']:
+            # Get directory from user instead of using current directory
+            directory = get_directory_from_user()
+            if directory is None:
+                continue  # Go back to action selection if no directory selected
+            
+            if action == 'e':
+                encrypt_files_in_directory(directory)
+            else:
+                decrypt_files_in_directory(directory)
+            break  # Exit the loop after successful operation
         else:
-            decrypt_files_in_directory(directory)
-    else:
-        print("Invalid choice. Please choose 'e' for encryption or 'd' for decryption.")
-        return
+            print(f"{Fore.RED}Invalid choice. Please choose 'e' for encryption, 'd' for decryption, or 'q' to quit.")
 
 # Main entry point for program
 if __name__ == "__main__":

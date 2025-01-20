@@ -6,6 +6,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
+from colorama import init, Fore, Style
 from utils import (
     secure_delete,
     prompt_for_main_key,
@@ -26,6 +27,9 @@ from utils import (
     security_settings,
 )
 
+# Initialize colorama
+init(autoreset=True)
+
 # Decrypt keys_ivs directory using derived key from account password
 def decrypt_keys_ivs_directory(directory, password):
     directory = os.path.join(directory, 'keys_ivs')
@@ -38,7 +42,7 @@ def decrypt_keys_ivs_directory(directory, password):
         backend=default_backend()
     )
     derived_key = kdf.derive(password.encode())
-    print("Directory decrypted and password verified!")
+    print(f"{Fore.GREEN}Directory decrypted and password verified!")
     return derived_key
 
 # Decrypt single file using AES-GCM with provided key, IV, tag, and nonce
@@ -51,7 +55,7 @@ def decrypt_file(file_path, aes_key, iv, tag, nonce):
         data = decryptor.update(ciphertext) + decryptor.finalize()
         return data
     except Exception as e:
-        print(f"Decryption Error: {e}")
+        print(f"{Fore.RED}Decryption Error: {e}")
         return None
 
 # Main decryption function - handles directory selection, password verification, and file decryption
@@ -67,14 +71,14 @@ def decrypt_files_in_directory(directory):
         
         stored_hash = get_stored_password_hash()
         if stored_hash is None:
-            print("No password set up. Restarting program for setup...")
+            print(f"{Fore.RED}No password set up. Restarting program for setup...")
             from main import main  # Import here to avoid circular import
             main()
             return
 
         attempts = 0
         while attempts < 3:
-            account_password = getpass.getpass("Enter your account password to unlock keys: ")
+            account_password = getpass.getpass(f"{Fore.CYAN}Enter your account password to unlock keys: ")
             
             if check_password(stored_hash, account_password):
                 keys_dir = os.path.join(directory, 'keys_ivs')
@@ -91,7 +95,7 @@ def decrypt_files_in_directory(directory):
 
                 try:
                     # Start the loading animation
-                    animation_thread = start_loading_animation("Decrypting files")
+                    animation_thread = start_loading_animation(f"{Fore.CYAN}Decrypting files")
 
                     # Decrypt the AES key and IV
                     aes_key, iv = decrypt_aes_key_and_iv(ciphertext, tag, nonce, main_key)
@@ -119,7 +123,7 @@ def decrypt_files_in_directory(directory):
 
                         # Check if both the tag and nonce files exist
                         if not os.path.exists(tag_file_path) or not os.path.exists(nonce_file_path):
-                            print(f"Tag or Nonce file not found for {filename}. Skipping decryption.")
+                            print(f"{Fore.RED}Tag or Nonce file not found for {filename}. Skipping decryption.")
                             continue  # Skip this file and move on to the next one
 
                         # Read the tag and nonce files if they exist
@@ -129,13 +133,13 @@ def decrypt_files_in_directory(directory):
                             with open(nonce_file_path, 'rb') as nonce_file:
                                 nonce = nonce_file.read()
                         except FileNotFoundError:
-                            print(f"Tag or Nonce file not found for {filename}. Skipping decryption.")
+                            print(f"{Fore.RED}Tag or Nonce file not found for {filename}. Skipping decryption.")
                             continue  # Skip this file and move on to the next one
 
                         # Now decrypt the file with aes_key, iv, tag, and nonce
                         decrypted_data = decrypt_file(file_path, aes_key, iv, tag, nonce)
                         if decrypted_data is None:
-                            print(f"Decryption failed for {filename}.")
+                            print(f"{Fore.RED}Decryption failed for {filename}.")
                             continue  # Skip to the next file if decryption failed
 
                         # Write the decrypted data to a new file
@@ -149,7 +153,7 @@ def decrypt_files_in_directory(directory):
                             secure_delete(tag_file_path)
                             secure_delete(nonce_file_path)
                         except Exception as e:
-                            print(f"Error deleting files for {filename}: {e}")
+                            print(f"{Fore.RED}Error deleting files for {filename}: {e}")
                     
                     # Stop the animation
                     stop_loading_animation(animation_thread)
@@ -161,26 +165,26 @@ def decrypt_files_in_directory(directory):
                 # If the encrypted keys file is not found, print an error message and exit the function
                 except FileNotFoundError:
                     stop_loading_animation(animation_thread)
-                    print("Error: Encrypted keys file not found.")
+                    print(f"{Fore.RED}Error: Encrypted keys file not found.")
                     return
             
             # If the password is incorrect, print an error message and increment the attempt counter
             attempts += 1
             if attempts < 3:
-                print(f"Invalid password. {3 - attempts} attempt(s) remaining.")
+                print(f"{Fore.RED}Invalid password. {3 - attempts} attempt(s) remaining.")
             else:
-                print("Too many failed attempts.")
-                if security_settings['wipe_on_fail']:
-                    print("Wiping encrypted files...")
+                print(f"{Fore.RED}Too many failed attempts.")
+                if security_settings['wipe_files_after_max_attempts']:
+                    print(f"{Fore.RED}Wiping encrypted files...")
                     wipe_encrypted_files(directory)
                 sys.exit(1)
 
         # If the user has made too many attempts, print an error message and exit the program
-        print("Too many failed attempts. Exiting.")
+        print(f"{Fore.RED}Too many failed attempts. Exiting.")
         sys.exit(1)
 
     except Exception as e:
-        print(f"\nDecryption error: {e}")
+        print(f"{Fore.RED}\nDecryption error: {e}")
     finally:
         cleanup_temp_state(directory)
         if animation_thread:
@@ -189,4 +193,5 @@ def decrypt_files_in_directory(directory):
 # Main entry point for decrypting files
 if __name__ == "__main__":
     directory = get_directory_from_user()
-    decrypt_files_in_directory(directory)
+    if directory is not None:  # Only proceed if a directory was selected
+        decrypt_files_in_directory(directory)
