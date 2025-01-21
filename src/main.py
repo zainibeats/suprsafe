@@ -207,7 +207,7 @@ def main():
         configure_wipe_files_after_max_attempts()
 
     while True:  # Keep asking until valid input is received
-        action = input(f"{Fore.CYAN}Choose action: (e) Encrypt, (d) Decrypt: ").strip().lower()
+        action = input(f"{Fore.CYAN}Choose action: (e) Encrypt or (d) Decrypt: ").strip().lower()
 
         if action == 'q':
             print(f"{Fore.YELLOW}Exiting SuprSafe. Goodbye!")

@@ -1,7 +1,7 @@
 # type: ignore
 import os
-import random
 import sys
+import random
 import hashlib
 import tkinter as tk
 from tkinter import simpledialog
@@ -21,7 +21,14 @@ init(autoreset=True)
 
 def get_data_dir():
     """Get the path to the data directory, creating it if it doesn't exist."""
-    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+    if getattr(sys, 'frozen', False):
+        # If running as compiled executable
+        app_data = os.getenv('APPDATA')  # This gets the Roaming AppData folder
+        data_dir = os.path.join(app_data, 'SuprSafe', 'data')
+    else:
+        # If running from source
+        data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+    
     os.makedirs(data_dir, exist_ok=True)
     return data_dir
 

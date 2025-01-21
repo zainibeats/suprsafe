@@ -15,31 +15,24 @@
 - **Key Generator Tool**: A separate utility (`main_key.py`) to generate secure 32-character main keys. Simply run the tool and press Enter to generate new keys, or 'q' to quit. Generated keys are suitable for use with SuprSafe's encryption process.
 - **Optional Executable**: SuprSafe can be run as an executable (`SuprSafe.exe`) for easier access, included in the release on GitHub.
 - **SuprSafe+ Mode**: An optional security feature that wipes encrypted files after too many failed password attempts.
+- **Secure Data Storage**: All configuration and password data is stored securely in the Windows AppData directory, isolated from the application files.
 
 ## Requirements
 
 - **Python 3.x:** Ensure you have Python 3.x installed on your system.
-- **Dependency Installation:** Install the necessary dependency using `pip`:
-
-```bash
-pip install cryptography
-```
+- **Dependencies:** The following packages are required:
+  - cryptography: For encryption/decryption operations
+  - colorama: For colored terminal output
+  - tkinter: For directory selection dialog (usually comes with Python)
+  - pyinstaller: only if you want to compile the executable
 
 ## Installation
 
 1. **Clone or Download:** Obtain the SuprSafe codebase by cloning the repository or downloading it directly to your local machine.
-2. **Install Dependencies:** Navigate to the SuprSafe directory in your terminal and execute the following command to install the required dependency:
+2. **Install Dependencies:** Navigate to the SuprSafe directory in your terminal and execute:
 
 ```bash
-pip install cryptography
-```
-
-## Running SuprSafe
-
-1. **Start the Program:** Launch the software by running the following command in your terminal:
-
-```bash
-python main.py
+pip install -r requirements.txt
 ```
 
 Alternatively, you can download the compiled executable (SuprSafe.exe) from the GitHub releases page and run it directly without needing to install Python or dependencies.
@@ -52,30 +45,34 @@ Once you run the program (either via the Python script or the executable), you w
 
 1. Run the SuprSafe executable or Python script from its current location. Alternatively, you can create a shortcut of the executable and place it in a convenient location for easy access.
 2. Choose the (e) option to encrypt files - you will be asked to create an account password on first launch. After this, you will be prompted for that password **after** choosing the encrypt/decrypt option in the CLI.
-3. Enter the directory path where you want the files to be encrypted.
+3. Select the directory containing files you want to encrypt when prompted.
 4. Enter your main key (32-character alphanumeric string). SuprSafe will use this to encrypt the randomly generated AES key and IV.
 5. The encrypted files will be saved with extensions like `.enc`, `.enc.tag`, and `.enc.nonce` to indicate their encrypted state.
-6. Your files are now encrypted - **DO NOT REMOVE ANY FILES ADDED BY THE SUPRSAFE**.
+6. Your files are now encrypted - **DO NOT REMOVE ANY FILES ADDED BY SUPRSAFE**.
 
 **Decrypting Files:**
 
 1. Run the SuprSafe executable or Python script from its current location. Alternatively, use a shortcut for easy access.
 2. Choose the (d) option to decrypt files.
-3. Enter the directory path where the encrypted files are located.
+3. Select the directory containing the encrypted files when prompted.
 4. Enter the account password created upon first launch.
 5. Provide the main key you used during the encryption process.
 6. The program will decrypt the selected files and restore them with their original filenames.
 7. SuprSafe securely deletes the encrypted files after successful decryption, eliminating any potential data remnants.
 
-## CLI Menu
+## Data Storage
 
-```text
-Welcome to SuprSafe!
+SuprSafe stores its configuration and password data in the following locations:
 
-Please choose an option:
-  (e) Encrypt Files
-  (d) Decrypt Files
-```
+- When running from source: `<project_root>/data/`
+- When running as executable: `C:\Users\<username>\AppData\Roaming\SuprSafe\data\`
+
+The following files are stored:
+- `password_hash.bin`: Contains your account password hash
+- `suprsafe_plus.bin`: Contains your admin password hash (if SuprSafe+ is configured)
+- `security_config.bin`: Contains your security settings
+
+**Note**: These files are essential for the operation of SuprSafe. Deleting them will require you to set up your passwords again.
 
 ## Security Considerations
 
