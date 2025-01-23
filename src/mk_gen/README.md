@@ -1,8 +1,8 @@
 # SuprSafe Main Key Generator
 
-![SuprSafe Main Key Generator](assets/images/mk_gen_sc.png)
-
 A secure key generation tool to be used with SuprSafe.
+
+![SuprSafe Main Key Generator](assets/images/mk_gen_sc.png)
 
 ## Installation
 
