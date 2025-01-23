@@ -1,5 +1,7 @@
 # **SuprSafe**
 
+![SuprSafe Logo](assets/images/suprsafe_png.png)
+
 **Warning**: This project may have flaws, and caution is advised when using the software. If the program is interrupted during encryption or decryption, there may not be a way to restore the data. SuprSafe has not undergone extensive testing, and its stability and reliability are not guaranteed. Use at your own risk.
 
 **SuprSafe** is a powerful yet user-friendly file encryption software that safeguards your sensitive data using the industry-standard AES-256 algorithm. With its intuitive command-line interface (CLI), SuprSafe empowers you to encrypt and decrypt files effortlessly, ensuring their confidentiality without unnecessary complexity. A companion key generator tool is included to help generate secure main keys.
