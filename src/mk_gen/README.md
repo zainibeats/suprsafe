@@ -103,3 +103,5 @@ The executable will be created in the `dist` directory.
 ## Integration with SuprSafe
 
 This tool is designed to work with SuprSafe encryption software. For full documentation on using SuprSafe, please refer to the main SuprSafe README.
+
+![SuprSafe Main Key Generator](assets/images/mk_gen_sc.png)
