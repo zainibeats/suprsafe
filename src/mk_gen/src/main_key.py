@@ -22,8 +22,6 @@ def create_seed_from_input(user_input: str) -> int:
     """Create a unique seed from user input."""
     hasher = hashlib.sha256()
     hasher.update(user_input.encode())
-    time_bytes = str(time.time()).encode()
-    hasher.update(time_bytes)
     return int.from_bytes(hasher.digest()[:8], 'big')
 
 def generate_aes_key(user_input: str | None = None) -> tuple[bytes, str]:
@@ -32,14 +30,7 @@ def generate_aes_key(user_input: str | None = None) -> tuple[bytes, str]:
         seed = create_seed_from_input(user_input)
         random.seed(seed)
         
-        mixed_bytes = bytearray()
-        for _ in range(24):
-            sys_byte = secrets.randbelow(256)
-            seeded_byte = random.randint(0, 255)
-            mixed_byte = (sys_byte + seeded_byte) % 256
-            mixed_bytes.append(mixed_byte)
-        
-        key = bytes(mixed_bytes)
+        key = bytes(random.randint(0, 255) for _ in range(24))
     else:
         key = secrets.token_bytes(24)
     
