@@ -1,0 +1,64 @@
+{
+  "name": "suprsafe",
+  "version": "1.0.0",
+  "description": "Secure file encryption with AES-256",
+  "main": "dist/electron/main.js",
+  "scripts": {
+    "start": "concurrently \"npm run start:react\" \"npm run start:electron\"",
+    "dev": "concurrently \"npm run start:react\" \"npm run start:electron\"",
+    "start:react": "cross-env BROWSER=none react-scripts start",
+    "start:electron": "tsc -p electron/tsconfig.json && node scripts/postbuild.js && electron .",
+    "build": "react-scripts build && tsc -p electron/tsconfig.json && node scripts/postbuild.js",
+    "package": "npm run build && electron-builder build --win --mac --linux"
+  },
+  "dependencies": {
+    "lucide-react": "^0.279.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^16.11.7",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "concurrently": "^7.0.0",
+    "cross-env": "^7.0.3",
+    "electron": "^25.0.0",
+    "electron-builder": "^24.6.3",
+    "react-scripts": "5.0.1",
+    "tailwindcss": "^3.3.0",
+    "typescript": "^4.9.5"
+  },
+  "build": {
+    "appId": "com.suprsafe.app",
+    "productName": "SuprSafe",
+    "files": [
+      "dist/**/*",
+      "build/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "assets"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

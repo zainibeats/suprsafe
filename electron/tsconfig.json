@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2018",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "outDir": "../dist/electron",
+    "rootDir": "../",
+    "sourceMap": true,
+    "baseUrl": "../"
+  },
+  "include": [
+    "./**/*", 
+    "../src/lib/**/*"
+  ]
+} 
